@@ -1,0 +1,41 @@
+# Local environment
+.env.local
+frontend/.env.local
+.localhost-pids.json
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.ruff_cache/
+.venv/
+venv/
+htmlcov/
+.coverage
+
+# SQLite
+datagov.db
+backend/datagov.db
+backend/datagov_*.db
+backend/sample_business.db
+backend/sample_*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+frontend/test-results/
+frontend/tsconfig.tsbuildinfo
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

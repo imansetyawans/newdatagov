@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataGov MVP Kanban</title>
+  <style>
+    :root {
+      --color-brand: #0f766e;
+      --color-brand-light: #ccfbf1;
+      --color-brand-surface: #f0fdfa;
+      --color-success-text: #166534;
+      --color-success-bg: #f0fdf4;
+      --color-success-border: #bbf7d0;
+      --color-warning-text: #92400e;
+      --color-warning-bg: #fffbeb;
+      --color-warning-border: #fde68a;
+      --color-danger-text: #991b1b;
+      --color-danger-bg: #fef2f2;
+      --color-danger-border: #fecaca;
+      --color-page-bg: #f8fafc;
+      --color-card-bg: #ffffff;
+      --color-surface: #f8fafc;
+      --color-border: #e2e8f0;
+      --color-border-strong: #cbd5e1;
+      --color-text-primary: #0f172a;
+      --color-text-secondary: #475569;
+      --color-text-muted: #94a3b8;
+      --font-ui: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--color-page-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 220px minmax(1040px, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      background: #fff;
+      border-right: 1px solid var(--color-border);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .brand-mark {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--color-brand);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 500;
+      line-height: 1.2;
+      background: #f1f5f9;
+      color: var(--color-text-secondary);
+      border: 1px solid transparent;
+    }
+
+    .badge.must {
+      background: var(--color-danger-bg);
+      color: var(--color-danger-text);
+      border-color: var(--color-danger-border);
+    }
+
+    .badge.should {
+      background: var(--color-warning-bg);
+      color: var(--color-warning-text);
+      border-color: var(--color-warning-border);
+    }
+
+    .badge.local {
+      background: var(--color-brand-surface);
+      color: var(--color-brand);
+      border-color: var(--color-brand-light);
+    }
+
+    .sidebar-section-title {
+      margin: 0 0 8px;
+      color: var(--color-text-muted);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .phase-list {
+      display: grid;
+      gap: 4px;
+    }
+
+    .phase-button {
+      border: 0;
+      background: transparent;
+      color: var(--color-text-secondary);
+      text-align: left;
+      border-radius: 6px;
+      padding: 7px 8px;
+    }
+
+    .phase-button.active {
+      background: var(--color-brand-surface);
+      color: var(--color-brand);
+      font-weight: 500;
+    }
+
+    .sidebar-note {
+      margin-top: auto;
+      border-top: 1px solid var(--color-border);
+      padding-top: 12px;
+      color: var(--color-text-secondary);
+      font-size: 11px;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 48px;
+      background: #fff;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .breadcrumb {
+      color: var(--color-text-muted);
+      font-size: 12px;
+    }
+
+    .breadcrumb strong {
+      color: var(--color-text-primary);
+      font-weight: 500;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .button {
+      min-height: 32px;
+      border-radius: 7px;
+      border: 1px solid var(--color-border);
+      background: #fff;
+      color: var(--color-text-secondary);
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .button.primary {
+      background: var(--color-brand);
+      color: #fff;
+      border-color: var(--color-brand);
+    }
+
+    .button:focus,
+    .phase-button:focus,
+    .card:focus,
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: 2px solid var(--color-brand);
+      outline-offset: 2px;
+    }
+
+    .content {
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--color-text-secondary);
+      max-width: 820px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .metric {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .metric-label {
+      color: var(--color-text-muted);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin-top: 4px;
+      font-size: 24px;
+      line-height: 1.1;
+      font-weight: 500;
+    }
+
+    .metric-hint {
+      margin-top: 4px;
+      color: var(--color-text-secondary);
+      font-size: 11px;
+    }
+
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .search {
+      min-width: 320px;
+      height: 34px;
+      border: 1px solid var(--color-border);
+      border-radius: 7px;
+      padding: 0 10px;
+      color: var(--color-text-primary);
+    }
+
+    .select {
+      height: 34px;
+      border: 1px solid var(--color-border);
+      border-radius: 7px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--color-text-primary);
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(210px, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
+    .column {
+      min-height: 560px;
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .column-header {
+      padding: 12px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .column-title {
+      font-weight: 500;
+    }
+
+    .column-count {
+      min-width: 22px;
+      height: 20px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: #f1f5f9;
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .lane {
+      min-height: 516px;
+      padding: 10px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .lane.drag-over {
+      background: var(--color-brand-surface);
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      cursor: grab;
+    }
+
+    .card:active {
+      cursor: grabbing;
+    }
+
+    .card-title {
+      font-weight: 500;
+      line-height: 1.35;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .card-desc {
+      color: var(--color-text-secondary);
+      font-size: 12px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--color-text-muted);
+      font-size: 11px;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .progress {
+      height: 6px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--color-brand);
+    }
+
+    .empty {
+      color: var(--color-text-muted);
+      padding: 20px 8px;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .detail-panel {
+      background: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .checklist {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--color-text-secondary);
+    }
+
+    .checklist li + li {
+      margin-top: 4px;
+    }
+
+    @media (max-width: 1180px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+
+      .board,
+      .metrics,
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">D</div>
+        <div>
+          <div class="brand-title">DataGov</div>
+          <span class="badge local">MVP localhost</span>
+        </div>
+      </div>
+
+      <section>
+        <p class="sidebar-section-title">Phases</p>
+        <div class="phase-list" id="phaseFilters"></div>
+      </section>
+
+      <section>
+        <p class="sidebar-section-title">Environment</p>
+        <div class="phase-list">
+          <button class="phase-button active" type="button">SQLite metadata DB</button>
+          <button class="phase-button active" type="button">FastAPI localhost:8000</button>
+          <button class="phase-button active" type="button">Next.js localhost:3000</button>
+          <button class="phase-button active" type="button">Redis for Celery only</button>
+        </div>
+      </section>
+
+      <p class="sidebar-note">
+        Progress is stored in this browser using localStorage. Use export when you want to share a snapshot.
+      </p>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumb">DataGov MVP / <strong>Development kanban</strong></div>
+        <div class="top-actions">
+          <button class="button" id="resetButton" type="button">Reset board</button>
+          <button class="button primary" id="exportButton" type="button">Export JSON</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="page-header">
+          <div>
+            <h1>Data governance tools delivery tracker</h1>
+            <p class="subtitle">
+              Tracks the approved MVP requirements, technical plan, and UI/UX brief for a localhost-first build using SQLite as the development database.
+            </p>
+          </div>
+          <span class="badge local">10-week plan</span>
+        </section>
+
+        <section class="metrics" aria-label="Progress summary">
+          <div class="metric">
+            <div class="metric-label">Total cards</div>
+            <div class="metric-value" id="totalCards">0</div>
+            <div class="metric-hint">Implementation work packages</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Done</div>
+            <div class="metric-value" id="doneCards">0</div>
+            <div class="metric-hint">Completed work items</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Active</div>
+            <div class="metric-value" id="activeCards">0</div>
+            <div class="metric-hint">Ready or in progress</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Completion</div>
+            <div class="metric-value" id="completion">0%</div>
+            <div class="metric-hint">
+              <div class="progress" aria-hidden="true"><span id="completionBar"></span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="filters" aria-label="Board filters">
+          <input class="search" id="searchInput" type="search" placeholder="Search cards, requirement IDs, modules">
+          <select class="select" id="priorityFilter" aria-label="Priority filter">
+            <option value="all">All priorities</option>
+            <option value="Must">Must have</option>
+            <option value="Should">Should have</option>
+            <option value="Foundation">Foundation</option>
+          </select>
+          <select class="select" id="moduleFilter" aria-label="Module filter">
+            <option value="all">All modules</option>
+          </select>
+        </section>
+
+        <section class="board" id="board" aria-label="Kanban board"></section>
+
+        <section class="detail-panel">
+          <div class="detail-grid">
+            <div>
+              <h2 style="margin:0 0 8px;font-size:15px;font-weight:500;">Delivery guardrails</h2>
+              <ul class="checklist">
+                <li>Build as a local web app first: Next.js on localhost:3000 and FastAPI on localhost:8000.</li>
+                <li>Use SQLite for local metadata storage, with SQLAlchemy models kept portable for PostgreSQL migration later.</li>
+                <li>Keep Redis scoped to Celery background scan progress, not as the primary data store.</li>
+                <li>Implement RBAC, audit logging, and masking at the API layer, not only in UI controls.</li>
+                <li>Use Clean Enterprise Light UI tokens, compact tables, semantic status color, and sentence case labels.</li>
+              </ul>
+            </div>
+            <div>
+              <h2 style="margin:0 0 8px;font-size:15px;font-weight:500;">MVP success shape</h2>
+              <ul class="checklist">
+                <li>Catalogue data assets and columns from connected sources.</li>
+                <li>Run scans that calculate completeness, uniqueness, consistency, and accuracy.</li>
+                <li>Apply governance policies, classification labels, and masking rules.</li>
+                <li>Link glossary terms to physical assets and show table-level lineage.</li>
+                <li>Ship tests, accessibility checks, and setup documentation before launch readiness.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "datagov-kanban-v10";
+    const COLUMNS = [
+      { id: "backlog", title: "Backlog" },
+      { id: "ready", title: "Ready" },
+      { id: "progress", title: "In progress" },
+      { id: "blocked", title: "Blocked" },
+      { id: "done", title: "Done" }
+    ];
+
+    const seedCards = [
+      {
+        id: "p0-backend-scaffold",
+        title: "Backend scaffold and SQLite database",
+        phase: "Phase 0",
+        module: "Platform",
+        priority: "Foundation",
+        status: "done",
+        refs: ["DEVPLAN 5", "TSD 1"],
+        desc: "Create FastAPI structure, config, SQLAlchemy database layer, Alembic setup, health endpoint, and initial SQLite datagov.db."
+      },
+      {
+        id: "p0-models",
+        title: "Initial SQLAlchemy schema models",
+        phase: "Phase 0",
+        module: "Platform",
+        priority: "Foundation",
+        status: "done",
+        refs: ["DEVPLAN 5"],
+        desc: "Define assets, columns, DQ issues, policies, glossary, lineage, scans, audit logs, users, and connectors."
+      },
+      {
+        id: "p0-frontend-scaffold",
+        title: "Next.js app shell and design tokens",
+        phase: "Phase 0",
+        module: "Frontend",
+        priority: "Foundation",
+        status: "done",
+        refs: ["UIUX 4", "UIUX 9"],
+        desc: "Create Next.js app with sidebar, topbar, Tailwind, Inter, JetBrains Mono, and Clean Enterprise Light CSS variables."
+      },
+      {
+        id: "p0-local-tooling",
+        title: "Local developer tooling",
+        phase: "Phase 0",
+        module: "Platform",
+        priority: "Foundation",
+        status: "done",
+        refs: ["DEVPLAN 3"],
+        desc: "Add root Makefile, .env.example, .gitignore, Redis docker-compose, seed script, lint, format, and test commands."
+      },
+      {
+        id: "p0-dev-orchestration-polish",
+        title: "One-command local dev workflow",
+        phase: "Phase 0",
+        module: "Platform",
+        priority: "Foundation",
+        status: "done",
+        refs: ["DEVPLAN 3"],
+        desc: "Upgrade the root dev command from guidance text to a practical local workflow for starting backend and frontend together."
+      },
+      {
+        id: "p0-health-indicator-polish",
+        title: "Dashboard backend health indicator",
+        phase: "Phase 0",
+        module: "Frontend",
+        priority: "Foundation",
+        status: "done",
+        refs: ["DEVPLAN 5"],
+        desc: "Show a small dashboard signal that confirms the frontend can reach the FastAPI /health endpoint."
+      },
+      {
+        id: "p1-auth-rbac",
+        title: "Authentication and RBAC",
+        phase: "Phase 1",
+        module: "Identity",
+        priority: "Must",
+        status: "done",
+        refs: ["USR-001", "USR-003", "USR-004"],
+        desc: "Implement password login, JWT sessions, role enforcement for Admin, Editor, and Viewer, plus 8-hour expiry."
+      },
+      {
+        id: "p1-users-page",
+        title: "Users and roles settings",
+        phase: "Phase 1",
+        module: "Identity",
+        priority: "Must",
+        status: "done",
+        refs: ["USR-002", "USR-005"],
+        desc: "Create user invite, role assignment, deactivation, and sidebar user footer."
+      },
+      {
+        id: "p1-connectors",
+        title: "Connector framework",
+        phase: "Phase 1",
+        module: "Connectors",
+        priority: "Must",
+        status: "done",
+        refs: ["CAT-001", "TSD 2"],
+        desc: "Build BaseConnector plus SQLite local connector first, then PostgreSQL connector and connector test endpoint."
+      },
+      {
+        id: "p1-catalogue-api",
+        title: "Catalogue API and search",
+        phase: "Phase 1",
+        module: "Catalogue",
+        priority: "Must",
+        status: "done",
+        refs: ["CAT-002", "CAT-004", "CAT-007"],
+        desc: "Expose asset list, detail, columns, edit, and search endpoints with filters for source, type, classification, DQ, and owner."
+      },
+      {
+        id: "p1-catalogue-ui",
+        title: "Asset catalogue and detail pages",
+        phase: "Phase 1",
+        module: "Catalogue",
+        priority: "Must",
+        status: "done",
+        refs: ["CAT-002", "CAT-003", "UIUX 6.2"],
+        desc: "Build compact table catalogue, asset detail tabs, column table, owner, tags, classifications, and last scanned display."
+      },
+      {
+        id: "p1-scan-engine",
+        title: "Basic scan engine and progress stream",
+        phase: "Phase 1",
+        module: "Scan",
+        priority: "Must",
+        status: "done",
+        refs: ["SCN-001", "SCN-004"],
+        desc: "Create scan model, Celery app, scan task stages, Redis progress pub/sub, REST endpoints, and SSE stream."
+      },
+      {
+        id: "p1-scan-flow-ui",
+        title: "Four-step run scan UI",
+        phase: "Phase 1",
+        module: "Scan",
+        priority: "Must",
+        status: "done",
+        refs: ["SCN-001", "SCN-002", "SCN-003", "SCN-005"],
+        desc: "Implement source selection, configuration, live running view, result summary, and dashboard Run scan entry point."
+      },
+      {
+        id: "p2-dq-engine",
+        title: "Data quality metric engine",
+        phase: "Phase 2",
+        module: "Quality",
+        priority: "Must",
+        status: "done",
+        refs: ["DQ-001", "DQ-002", "DQ-003", "DQ-004", "DQ-005"],
+        desc: "Calculate completeness, uniqueness, consistency, accuracy, and asset-level weighted DQ score during scans."
+      },
+      {
+        id: "p2-dq-issues",
+        title: "DQ issue detection and resolution",
+        phase: "Phase 2",
+        module: "Quality",
+        priority: "Must",
+        status: "done",
+        refs: ["DQ-006", "DQ-008", "DQ-009", "DQ-010"],
+        desc: "Flag score drops, show open issues with filters, and support resolution notes with history retention."
+      },
+      {
+        id: "p2-dq-ui",
+        title: "DQ score UI and quality pages",
+        phase: "Phase 2",
+        module: "Quality",
+        priority: "Must",
+        status: "done",
+        refs: ["DQ-005", "DQ-007", "UIUX 5.2"],
+        desc: "Create quality dashboard metrics, score table, issue page, and asset-column DQ breakdown display."
+      },
+      {
+        id: "p2-policy-engine",
+        title: "Governance policy engine",
+        phase: "Phase 2",
+        module: "Governance",
+        priority: "Must",
+        status: "done",
+        refs: ["GOV-001", "GOV-002", "GOV-004"],
+        desc: "Seed built-in labels, evaluate active policies on scan, and apply automatic classification tags."
+      },
+      {
+        id: "p2-masking-audit",
+        title: "Masking and immutable audit log",
+        phase: "Phase 2",
+        module: "Governance",
+        priority: "Must",
+        status: "done",
+        refs: ["GOV-003", "GOV-006"],
+        desc: "Mask PII, Sensitive, and Restricted sample values for Viewer role and record policy, sample access, and issue resolution actions."
+      },
+      {
+        id: "p2-governance-ui",
+        title: "Policies and classification coverage UI",
+        phase: "Phase 2",
+        module: "Governance",
+        priority: "Must",
+        status: "done",
+        refs: ["GOV-005", "GOV-007", "UIUX 6.5"],
+        desc: "Build policy list, simple rule builder, classification coverage cards, audit preview, and dashboard governance metrics."
+      },
+      {
+        id: "p2-scheduled-scan-stub",
+        title: "Scheduled scan configuration stub",
+        phase: "Phase 2",
+        module: "Scan",
+        priority: "Should",
+        status: "done",
+        refs: ["SCN-006"],
+        desc: "Store cron expression and notification preference locally, expose schedule APIs, and show scheduled scans in the Run scan flow."
+      },
+      {
+        id: "p25-modular-metadata-db",
+        title: "Modular metadata database split",
+        phase: "Phase 2.5",
+        module: "Architecture",
+        priority: "Must",
+        status: "done",
+        refs: ["Architecture discussion", "SQLite localhost"],
+        desc: "Split DataGov metadata into admin, catalogue, classification, quality, policy, glossary, and audit SQLite DBs, seed sample_business.db separately, and block scanning metadata DB paths."
+      },
+      {
+        id: "p25-scoped-connector-catalogue",
+        title: "Scoped connector catalogue ingestion",
+        phase: "Phase 2.5",
+        module: "Architecture",
+        priority: "Must",
+        status: "done",
+        refs: ["Connector schema selection", "Catalogue architecture"],
+        desc: "Discover connector schemas and tables, let users choose SQLite catalogue scope, scan only selected assets, and persist metadata into the DataGov catalogue database."
+      },
+      {
+        id: "p25-multi-schema-sample-data",
+        title: "Multi-schema SQLite sample datasets",
+        phase: "Phase 2.5",
+        module: "Connectors",
+        priority: "Should",
+        status: "done",
+        refs: ["SQLite connector", "Schema testing"],
+        desc: "Seed attached SQLite datasets for sales, HR, and finance so the connector scope flow can be tested with multiple schemas from one source connector."
+      },
+      {
+        id: "p3-glossary-api",
+        title: "Business glossary service and API",
+        phase: "Phase 3",
+        module: "Glossary",
+        priority: "Must",
+        status: "done",
+        refs: ["GLO-001", "GLO-002", "GLO-003", "GLO-005"],
+        desc: "Support glossary CRUD, term status, steward, synonyms, related terms, and asset or column links."
+      },
+      {
+        id: "p3-glossary-ui",
+        title: "Glossary pages and linking workflow",
+        phase: "Phase 3",
+        module: "Glossary",
+        priority: "Must",
+        status: "done",
+        refs: ["GLO-001", "GLO-002", "UIUX 6.6"],
+        desc: "Build searchable term cards, detail modal, term form, linked assets panel, and glossary badges on asset detail."
+      },
+      {
+        id: "p3-glossary-suggestions",
+        title: "Glossary link suggestions",
+        phase: "Phase 3",
+        module: "Glossary",
+        priority: "Should",
+        status: "done",
+        refs: ["GLO-004"],
+        desc: "Suggest links between new assets and glossary terms by matching column names and term synonyms."
+      },
+      {
+        id: "p3-lineage-api",
+        title: "Table-level lineage extraction",
+        phase: "Phase 3",
+        module: "Lineage",
+        priority: "Must",
+        status: "done",
+        refs: ["LIN-001", "LIN-002", "LIN-005"],
+        desc: "Extract table-level lineage from foreign-key-like columns, store table-level edges, and refresh on scan."
+      },
+      {
+        id: "p3-lineage-ui",
+        title: "Lineage canvas and mini-panel",
+        phase: "Phase 3",
+        module: "Lineage",
+        priority: "Must",
+        status: "done",
+        refs: ["LIN-002", "LIN-003", "LIN-004", "UIUX 6.7"],
+        desc: "Build lineage graph view, summary mini-panel, extraction control, and edge table for upstream/downstream review."
+      },
+      {
+        id: "p4-accessibility",
+        title: "Accessibility and UI interaction audit",
+        phase: "Phase 4",
+        module: "Quality gate",
+        priority: "Must",
+        status: "done",
+        refs: ["NFR-012", "UIUX 8"],
+        desc: "Verify contrast, keyboard order, focus rings, labels, table headers, aria-live scan logs, and status text."
+      },
+      {
+        id: "p4-performance",
+        title: "Performance and SQLite query optimization",
+        phase: "Phase 4",
+        module: "Quality gate",
+        priority: "Must",
+        status: "done",
+        refs: ["NFR-001", "NFR-002", "NFR-003", "NFR-014"],
+        desc: "Add indexes, tune React Query caching, virtualize large catalogue tables, and check frontend bundle size."
+      },
+      {
+        id: "p4-notifications",
+        title: "Email and Slack notifications",
+        phase: "Phase 4",
+        module: "Notifications",
+        priority: "Should",
+        status: "done",
+        refs: ["USR-002", "SCN-006", "BRD 5.2"],
+        desc: "Add SMTP invites, scan completion emails, and optional Slack webhooks for scan results and critical DQ issues."
+      },
+      {
+        id: "p4-tests",
+        title: "Backend, frontend, and E2E tests",
+        phase: "Phase 4",
+        module: "Testing",
+        priority: "Must",
+        status: "done",
+        refs: ["DEVPLAN 12", "DoD"],
+        desc: "Cover DQ engine, policy engine, catalogue, governance, lineage, auth RBAC, components, and Playwright journeys."
+      },
+      {
+        id: "p4-docs-launch",
+        title: "Launch readiness documentation",
+        phase: "Phase 4",
+        module: "Documentation",
+        priority: "Must",
+        status: "done",
+        refs: ["DEVPLAN 15", "DoD"],
+        desc: "Write README setup, architecture notes, env vars, API docstrings, changelog, error boundaries, and standard error envelope."
+      }
+    ];
+
+    const state = loadState();
+    const elements = {
+      board: document.getElementById("board"),
+      searchInput: document.getElementById("searchInput"),
+      priorityFilter: document.getElementById("priorityFilter"),
+      moduleFilter: document.getElementById("moduleFilter"),
+      phaseFilters: document.getElementById("phaseFilters"),
+      totalCards: document.getElementById("totalCards"),
+      doneCards: document.getElementById("doneCards"),
+      activeCards: document.getElementById("activeCards"),
+      completion: document.getElementById("completion"),
+      completionBar: document.getElementById("completionBar"),
+      resetButton: document.getElementById("resetButton"),
+      exportButton: document.getElementById("exportButton")
+    };
+
+    let draggedId = null;
+    let activePhase = "all";
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && Array.isArray(saved.cards)) {
+          const seedById = Object.fromEntries(seedCards.map(card => [card.id, card]));
+          return {
+            cards: saved.cards.map(card => ({ ...seedById[card.id], ...card })).filter(card => seedById[card.id])
+          };
+        }
+      } catch (error) {
+        console.warn("Unable to load saved kanban state", error);
+      }
+      return { cards: seedCards };
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function unique(values) {
+      return Array.from(new Set(values)).sort();
+    }
+
+    function initFilters() {
+      const phases = ["all", ...unique(seedCards.map(card => card.phase))];
+      elements.phaseFilters.innerHTML = phases.map(phase => (
+        `<button class="phase-button ${phase === activePhase ? "active" : ""}" type="button" data-phase="${phase}">${phase === "all" ? "All phases" : phase}</button>`
+      )).join("");
+
+      elements.phaseFilters.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", () => {
+          activePhase = button.dataset.phase;
+          initFilters();
+          render();
+        });
+      });
+
+      const modules = unique(seedCards.map(card => card.module));
+      elements.moduleFilter.innerHTML = `<option value="all">All modules</option>` + modules.map(module => (
+        `<option value="${module}">${module}</option>`
+      )).join("");
+    }
+
+    function filteredCards() {
+      const query = elements.searchInput.value.trim().toLowerCase();
+      const priority = elements.priorityFilter.value;
+      const module = elements.moduleFilter.value;
+      return state.cards.filter(card => {
+        const haystack = [
+          card.title,
+          card.phase,
+          card.module,
+          card.priority,
+          card.desc,
+          card.refs.join(" ")
+        ].join(" ").toLowerCase();
+        return (!query || haystack.includes(query)) &&
+          (priority === "all" || card.priority === priority) &&
+          (module === "all" || card.module === module) &&
+          (activePhase === "all" || card.phase === activePhase);
+      });
+    }
+
+    function cardTemplate(card) {
+      const priorityClass = card.priority === "Must" ? "must" : card.priority === "Should" ? "should" : "local";
+      return `
+        <article class="card" draggable="true" tabindex="0" data-card-id="${card.id}">
+          <div class="card-meta">
+            <span class="badge local">${card.phase}</span>
+            <span class="badge ${priorityClass}">${card.priority}</span>
+            <span class="badge">${card.module}</span>
+          </div>
+          <div class="card-title">${card.title}</div>
+          <div class="card-desc">${card.desc}</div>
+          <div class="card-footer">
+            <span class="mono">${card.refs.join(" / ")}</span>
+          </div>
+        </article>
+      `;
+    }
+
+    function render() {
+      const visibleCards = filteredCards();
+      elements.board.innerHTML = COLUMNS.map(column => {
+        const cards = visibleCards.filter(card => card.status === column.id);
+        return `
+          <section class="column">
+            <header class="column-header">
+              <div class="column-title">${column.title}</div>
+              <div class="column-count">${cards.length}</div>
+            </header>
+            <div class="lane" data-status="${column.id}">
+              ${cards.length ? cards.map(cardTemplate).join("") : `<div class="empty">No matching cards</div>`}
+            </div>
+          </section>
+        `;
+      }).join("");
+
+      bindDragHandlers();
+      updateMetrics();
+    }
+
+    function bindDragHandlers() {
+      elements.board.querySelectorAll(".card").forEach(card => {
+        card.addEventListener("dragstart", event => {
+          draggedId = card.dataset.cardId;
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", draggedId);
+        });
+      });
+
+      elements.board.querySelectorAll(".lane").forEach(lane => {
+        lane.addEventListener("dragover", event => {
+          event.preventDefault();
+          lane.classList.add("drag-over");
+        });
+        lane.addEventListener("dragleave", () => lane.classList.remove("drag-over"));
+        lane.addEventListener("drop", event => {
+          event.preventDefault();
+          lane.classList.remove("drag-over");
+          const id = draggedId || event.dataTransfer.getData("text/plain");
+          const card = state.cards.find(item => item.id === id);
+          if (card) {
+            card.status = lane.dataset.status;
+            saveState();
+            render();
+          }
+          draggedId = null;
+        });
+      });
+    }
+
+    function updateMetrics() {
+      const total = state.cards.length;
+      const done = state.cards.filter(card => card.status === "done").length;
+      const active = state.cards.filter(card => card.status === "ready" || card.status === "progress").length;
+      const percent = total ? Math.round((done / total) * 100) : 0;
+      elements.totalCards.textContent = total;
+      elements.doneCards.textContent = done;
+      elements.activeCards.textContent = active;
+      elements.completion.textContent = `${percent}%`;
+      elements.completionBar.style.width = `${percent}%`;
+    }
+
+    elements.searchInput.addEventListener("input", render);
+    elements.priorityFilter.addEventListener("change", render);
+    elements.moduleFilter.addEventListener("change", render);
+
+    elements.resetButton.addEventListener("click", () => {
+      if (confirm("Reset the board to the original requirements-derived status?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        state.cards = seedCards.map(card => ({ ...card }));
+        render();
+      }
+    });
+
+    elements.exportButton.addEventListener("click", async () => {
+      const snapshot = JSON.stringify({
+        exportedAt: new Date().toISOString(),
+        project: "DataGov MVP",
+        database: "SQLite for localhost development",
+        cards: state.cards
+      }, null, 2);
+      try {
+        await navigator.clipboard.writeText(snapshot);
+        elements.exportButton.textContent = "Copied JSON";
+        setTimeout(() => elements.exportButton.textContent = "Export JSON", 1400);
+      } catch (error) {
+        const exportWindow = window.open("", "_blank");
+        exportWindow.document.write(`<pre>${snapshot.replace(/[&<>]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char]))}</pre>`);
+      }
+    });
+
+    initFilters();
+    render();
+  </script>
+</body>
+</html>
