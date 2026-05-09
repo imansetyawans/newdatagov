@@ -15,6 +15,7 @@ dependencies = [
   "celery==5.4.0",
   "redis==5.2.1",
   "python-multipart==0.0.20",
+  "openpyxl==3.1.5",
 ]
 
 [project.scripts]

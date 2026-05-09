@@ -11,6 +11,7 @@ class ColumnRead(BaseModel):
     nullable: bool
     description: str | None = None
     standard_format: str | None = None
+    sample_values: list = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     classifications: list[str] = Field(default_factory=list)
     completeness_score: float | None = None

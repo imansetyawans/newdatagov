@@ -1,7 +1,7 @@
 from collections.abc import Generator
 from dataclasses import dataclass
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 from sqlalchemy import text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -61,7 +61,7 @@ def create_module_tables() -> None:
     for key, module in MODULE_DATABASES.items():
         tables = [Base.metadata.tables[table_name] for table_name in module.tables]
         Base.metadata.create_all(bind=engines[key], tables=tables)
-    ensure_sqlite_compatibility_columns()
+    ensure_compatibility_columns()
     ensure_sqlite_performance_indexes()
 
 
@@ -71,27 +71,36 @@ def _sqlite_columns(key: str, table_name: str) -> set[str]:
     return {str(row["name"]) for row in rows}
 
 
-def ensure_sqlite_compatibility_columns() -> None:
+def ensure_compatibility_columns() -> None:
     compatibility_columns = {
         "catalogue": {
             "columns": {
-                "standard_format": "TEXT",
+                "standard_format": {"sqlite": "TEXT", "postgresql": "TEXT"},
+                "sample_values": {
+                    "sqlite": "TEXT NOT NULL DEFAULT '[]'",
+                    "postgresql": "JSON NOT NULL DEFAULT '[]'::json",
+                },
             },
         },
         "classification": {
             "classification_labels": {
-                "masks_samples": "BOOLEAN NOT NULL DEFAULT 0",
+                "masks_samples": {"sqlite": "BOOLEAN NOT NULL DEFAULT 0", "postgresql": "BOOLEAN NOT NULL DEFAULT FALSE"},
             },
         },
     }
     for key, tables in compatibility_columns.items():
-        if not MODULE_DATABASES[key].url.startswith("sqlite"):
-            continue
+        dialect = engines[key].dialect.name
         for table_name, columns in tables.items():
-            existing_columns = _sqlite_columns(key, table_name)
+            if MODULE_DATABASES[key].url.startswith("sqlite"):
+                existing_columns = _sqlite_columns(key, table_name)
+            else:
+                existing_columns = {column["name"] for column in inspect(engines[key]).get_columns(table_name)}
             with engines[key].begin() as connection:
-                for column_name, ddl in columns.items():
+                for column_name, ddl_by_dialect in columns.items():
                     if column_name not in existing_columns:
+                        ddl = ddl_by_dialect.get(dialect)
+                        if ddl is None:
+                            continue
                         connection.execute(text(f"alter table {table_name} add column {column_name} {ddl}"))
 
 

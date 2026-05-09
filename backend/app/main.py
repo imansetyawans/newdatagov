@@ -12,6 +12,7 @@ from app.routers.lineage import router as lineage_router
 from app.routers.notifications import router as notifications_router
 from app.routers.quality import router as quality_router
 from app.routers.scans import router as scans_router
+from app.routers.uploads import router as uploads_router
 from app.services.classification_service import ensure_default_classification_labels
 
 
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(connectors_router)
     app.include_router(catalogue_router)
     app.include_router(scans_router)
+    app.include_router(uploads_router)
     app.include_router(quality_router)
     app.include_router(governance_router)
     app.include_router(glossary_router)

@@ -33,6 +33,7 @@ export type Column = {
   nullable: boolean;
   description: string | null;
   standard_format: string | null;
+  sample_values: unknown[];
   tags: string[];
   classifications: string[];
   completeness_score: number | null;

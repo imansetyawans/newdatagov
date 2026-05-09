@@ -22,6 +22,7 @@ class Column(TimestampMixin, Base):
     nullable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     standard_format: Mapped[str | None] = mapped_column(Text)
+    sample_values: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     classifications: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     completeness_score: Mapped[float | None]

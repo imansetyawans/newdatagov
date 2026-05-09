@@ -23,6 +23,7 @@ from app.schemas.catalogue import (
 from app.services.catalogue_service import get_asset, list_assets, update_asset
 from app.services.audit_service import write_audit_log
 from app.services.metadata_ai_service import generate_column_descriptions
+from app.services.upload_service import infer_standard_format
 
 
 router = APIRouter(prefix="/api/v1", tags=["catalogue"])
@@ -209,6 +210,10 @@ def _infer_standard_format(column_name: str, data_type: str, sample_values: list
     return None
 
 
+def _is_uploaded_asset(asset) -> bool:
+    return asset.connector_id is None and asset.source_path.startswith("upload.")
+
+
 @router.post(
     "/assets/{asset_id}/columns/detect-formats",
     response_model=ColumnMetadataGenerationResponse,
@@ -223,6 +228,31 @@ def detect_column_formats(
     asset = get_asset(catalogue_db, asset_id)
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    if _is_uploaded_asset(asset):
+        updated_count = 0
+        detected_formats: dict[str, str] = {}
+        for column in sorted(asset.columns, key=lambda item: item.ordinal_position):
+            detected_format = infer_standard_format(column.name, column.data_type, column.sample_values)
+            if detected_format:
+                column.standard_format = detected_format
+                detected_formats[column.name] = detected_format
+                updated_count += 1
+        write_audit_log(
+            audit_db,
+            user,
+            action="column_formats_detected",
+            resource_type="asset",
+            resource_id=asset.id,
+            event_type="catalogue",
+            metadata={"updated_count": updated_count, "columns": sorted(detected_formats)},
+        )
+        audit_db.commit()
+        catalogue_db.commit()
+        catalogue_db.refresh(asset)
+        return ColumnMetadataGenerationResponse(
+            data=asset,
+            meta={"provider": "stored-sample-detector", "updated_count": updated_count, "detected_formats": detected_formats},
+        )
     if asset.asset_type != "table" or asset.connector_id is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format detection is available for scanned tables only")
 
@@ -291,6 +321,42 @@ def asset_sample(
     asset = get_asset(catalogue_db, asset_id)
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    if _is_uploaded_asset(asset):
+        columns = sorted(asset.columns, key=lambda column: column.ordinal_position)
+        masking_labels = {
+            label.name
+            for label in classification_db.scalars(
+                select(ClassificationLabel).where(ClassificationLabel.masks_samples.is_(True))
+            ).all()
+        } | SENSITIVE_LABELS
+        sensitive_columns = {
+            column.name
+            for column in columns
+            if masking_labels.intersection(set(column.classifications))
+        }
+        column_samples = {
+            column.name: [MASKED_SAMPLE_VALUE] if column.name in sensitive_columns and column.sample_values else column.sample_values[:5]
+            for column in columns
+        }
+        write_audit_log(
+            audit_db,
+            user,
+            action="sample_viewed",
+            resource_type="asset",
+            resource_id=asset.id,
+            event_type="data_access",
+            metadata={"row_count": 0, "masked_columns": sorted(sensitive_columns), "source": "stored_column_samples"},
+        )
+        audit_db.commit()
+        return AssetSampleResponse(
+            data=[],
+            meta={
+                "count": 0,
+                "masked_columns": sorted(sensitive_columns),
+                "column_samples": column_samples,
+                "source": "stored_column_samples",
+            },
+        )
     if asset.asset_type != "table" or asset.connector_id is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sample data is available for scanned tables only")
 
