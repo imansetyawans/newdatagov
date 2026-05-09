@@ -1,0 +1,9 @@
+.vercel
+.venv
+.pytest_cache
+.ruff_cache
+pytest-cache-files-*
+tests
+*.db
+__pycache__
+*.pyc

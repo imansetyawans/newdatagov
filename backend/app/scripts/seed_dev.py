@@ -82,6 +82,13 @@ def seed_dataset_source(file_name: str, statements: list[str], rows: list[tuple[
     return source_path
 
 
+def portable_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
 def seed_attached_sources() -> list[dict]:
     sales_path = seed_dataset_source(
         "sample_sales.db",
@@ -210,9 +217,9 @@ def seed_attached_sources() -> list[dict]:
         ],
     )
     return [
-        {"schema": "sales", "database_path": str(sales_path)},
-        {"schema": "hr", "database_path": str(hr_path)},
-        {"schema": "finance", "database_path": str(finance_path)},
+        {"schema": "sales", "database_path": portable_path(sales_path)},
+        {"schema": "hr", "database_path": portable_path(hr_path)},
+        {"schema": "finance", "database_path": portable_path(finance_path)},
     ]
 
 
@@ -240,13 +247,13 @@ def seed() -> None:
                 Connector(
                     name="Sample Business SQLite",
                     connector_type="sqlite",
-                    config_encrypted={"database_path": str(sample_source_path), "attached_databases": attached_databases},
+                    config_encrypted={"database_path": portable_path(sample_source_path), "attached_databases": attached_databases},
                     status="active",
                 )
             )
         else:
             config = dict(connector.config_encrypted or {})
-            config["database_path"] = str(sample_source_path)
+            config["database_path"] = portable_path(sample_source_path)
             config["attached_databases"] = attached_databases
             connector.config_encrypted = config
             connector.status = "active"

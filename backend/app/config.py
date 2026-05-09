@@ -1,7 +1,10 @@
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field
+from pydantic import field_validator
 from pydantic import model_validator
+from pydantic_settings import NoDecode
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,10 +44,24 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/1"
 
     debug: bool = True
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     openai_api_key: str | None = None
     ai_metadata_model: str = "gpt-5-mini"
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
+        if isinstance(value, list):
+            return value
+        if not value:
+            return []
+
+        normalized = value.strip()
+        if normalized.startswith("[") and normalized.endswith("]"):
+            normalized = normalized[1:-1]
+
+        return [origin.strip().strip("'\"") for origin in normalized.split(",") if origin.strip()]
 
     @model_validator(mode="after")
     def apply_shared_database_url(self) -> "Settings":

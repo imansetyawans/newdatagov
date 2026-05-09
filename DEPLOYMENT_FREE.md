@@ -3,16 +3,17 @@
 This project can be deployed with a free-friendly split:
 
 - Frontend: Vercel Hobby
-- Backend API: Render Free Web Service
+- Backend API: Vercel FastAPI serverless
 - Metadata database: Supabase Free or Neon Free PostgreSQL
 
 Railway is not used for the free deployment path because its free trial is credit-based, not a permanent free hosting tier.
+Render can still be used with `render.yaml`, but Render API service creation currently requires billing details on this account even for a free web service.
 
 ## 1. Database
 
 Create or restore a Supabase/Neon PostgreSQL project and copy the connection string.
 
-Use the SQLAlchemy psycopg format in Render:
+Use the SQLAlchemy psycopg format:
 
 ```text
 postgresql+psycopg://USER:PASSWORD@HOST:5432/postgres
@@ -20,35 +21,39 @@ postgresql+psycopg://USER:PASSWORD@HOST:5432/postgres
 
 The backend supports a single shared `DATABASE_URL` for all DataGov metadata modules. Localhost still defaults to the modular SQLite files.
 
-## 2. Backend on Render
+For Supabase transaction/session poolers, the backend disables psycopg prepared statements automatically to avoid pooler prepared-statement conflicts.
 
-Create a Render Blueprint from this repository or create a Web Service manually.
+## 2. Backend on Vercel
 
-Blueprint file:
+Create a Vercel project from the `backend` directory. The backend uses:
 
 ```text
-render.yaml
+backend/vercel.json
+backend/pyproject.toml
+backend/app/index.py
 ```
 
-Required Render environment variables:
+Required Vercel production environment variables:
 
 ```text
 DATABASE_URL=postgresql+psycopg://...
 CORS_ORIGINS=["https://your-datagov-app.vercel.app"]
 DEBUG=false
 SECRET_KEY=<long random secret>
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+AI_METADATA_MODEL=gpt-5-mini
 ```
 
-Build command:
+The Vercel FastAPI build command is defined in `pyproject.toml` and seeds the cloud database:
 
 ```bash
-pip install -r requirements.txt && python -m app.scripts.seed_dev
+python -m app.scripts.seed_dev
 ```
 
-Start command:
+Production backend URL used for the current deployment:
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```text
+https://newdatagov-api.vercel.app
 ```
 
 ## 3. Frontend on Vercel
@@ -58,7 +63,7 @@ Create a Vercel project from the `frontend` directory.
 Set:
 
 ```text
-NEXT_PUBLIC_API_URL=https://your-datagov-api.onrender.com
+NEXT_PUBLIC_API_URL=https://your-datagov-api.vercel.app
 ```
 
 Build command:
@@ -79,6 +84,6 @@ After both deployments are live:
 
 ## Notes
 
-- Render Free may sleep after idle time; the first request after sleep can be slow.
+- Vercel serverless functions can have a cold start after idle time; the first request after a quiet period can be slower.
 - The sample SQLite source is seeded for demo scans. Production connectors should use cloud databases such as BigQuery, PostgreSQL, MySQL, Snowflake, or a local agent.
 - Do not use SQLite metadata databases as production cloud storage.

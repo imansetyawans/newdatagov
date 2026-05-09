@@ -35,7 +35,11 @@ MODULE_DATABASES = {
 
 
 def _connect_args(url: str) -> dict:
-    return {"check_same_thread": False} if url.startswith("sqlite") else {}
+    if url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    if url.startswith("postgresql+psycopg"):
+        return {"prepare_threshold": None}
+    return {}
 
 
 engines = {
