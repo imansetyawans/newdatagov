@@ -58,8 +58,12 @@ def test_upload_csv_processes_catalogue_quality_samples_and_policies(client: Tes
     credit_history = next(column for column in columns if column["name"] == "Credit_History")
     property_area = next(column for column in columns if column["name"] == "Property_Area")
     applicant_income = next(column for column in columns if column["name"] == "ApplicantIncome")
+    married = next(column for column in columns if column["name"] == "Married")
 
     assert loan_id["sample_values"][:2] == ["LP001015", "LP001022"]
+    assert "loan application identifier" in loan_id["description"]
+    assert "loan affordability" in applicant_income["description"]
+    assert "marital status" in married["description"]
     assert "Restricted" in loan_id["classifications"]
     assert credit_history["completeness_score"] == 83.3
     assert property_area["standard_format"] == "controlled vocabulary: Urban, Semiurban"
