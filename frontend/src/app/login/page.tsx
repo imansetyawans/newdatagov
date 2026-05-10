@@ -15,6 +15,7 @@ type LoginResponse = {
       email: string;
       full_name: string;
       role: CurrentUser["role"];
+      permissions: string[];
     };
   };
 };
@@ -41,7 +42,8 @@ export default function LoginPage() {
         id: user.id,
         email: user.email,
         fullName: user.full_name,
-        role: user.role
+        role: user.role,
+        permissions: user.permissions
       });
       window.location.assign("/");
     } catch {

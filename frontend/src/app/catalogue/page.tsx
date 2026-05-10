@@ -8,7 +8,9 @@ import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, Asset, CatalogueProject } from "@/lib/types";
+import { useAppStore } from "@/store/appStore";
 
 export default function CataloguePage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -26,6 +28,9 @@ export default function CataloguePage() {
   const [tableDescription, setTableDescription] = useState("");
   const [uploadProjectId, setUploadProjectId] = useState("");
   const [uploadCategoryId, setUploadCategoryId] = useState("");
+  const user = useAppStore((state) => state.user);
+  const hydrate = useAppStore((state) => state.hydrate);
+  const canUpload = hasPermission(user, "catalogue.upload");
 
   const activeFilterProject = projects.find((project) => project.id === projectFilter);
   const uploadProject = projects.find((project) => project.id === uploadProjectId);
@@ -45,6 +50,10 @@ export default function CataloguePage() {
       setMessage("Unable to load catalogue");
     }
   }, [query, projectFilter, categoryFilter, showUnassigned]);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -131,10 +140,12 @@ export default function CataloguePage() {
           <p className="mt-1 text-[13px] text-[var(--color-text-secondary)]">Search discovered tables, views, and columns.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="primary" onClick={() => setUploadOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
-            Upload dataset
-          </Button>
+          {canUpload ? (
+            <Button variant="primary" onClick={() => setUploadOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+              Upload dataset
+            </Button>
+          ) : null}
           <input
             className="h-9 w-[320px] rounded-[7px] border border-[var(--color-border)] px-3"
             placeholder="Search assets"

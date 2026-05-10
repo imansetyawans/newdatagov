@@ -13,11 +13,14 @@ from app.routers.notifications import router as notifications_router
 from app.routers.quality import router as quality_router
 from app.routers.scans import router as scans_router
 from app.routers.uploads import router as uploads_router
+from app.services.access_control import ensure_default_roles
 from app.services.classification_service import ensure_default_classification_labels
 
 
 def create_app() -> FastAPI:
     create_module_tables()
+    with sessionmakers["admin"]() as db:
+        ensure_default_roles(db)
     with sessionmakers["classification"]() as db:
         ensure_default_classification_labels(db)
 

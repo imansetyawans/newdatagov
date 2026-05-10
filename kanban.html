@@ -596,7 +596,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "datagov-kanban-v11";
+    const STORAGE_KEY = "datagov-kanban-v12";
     const COLUMNS = [
       { id: "backlog", title: "Backlog" },
       { id: "ready", title: "Ready" },
@@ -945,6 +945,16 @@
         status: "done",
         refs: ["Catalogue improvement discussion", "Project/category governance"],
         desc: "Add catalogue projects and per-project categories, asset assignment, catalogue filters, upload and scan assignment, Projects menu, audit logging, and smoke-test coverage."
+      },
+      {
+        id: "p46-user-role-permission-matrix",
+        title: "User management and role permission matrix",
+        phase: "Phase 4.6",
+        module: "Identity",
+        priority: "Must",
+        status: "done",
+        refs: ["User management discussion", "Action-level access control"],
+        desc: "Expose Users as a top-level menu, add roles and role permissions, seed admin/editor/viewer, manage permissions by menu/function, guard navigation, audit security changes, and cover positive/negative tests."
       }
     ];
 

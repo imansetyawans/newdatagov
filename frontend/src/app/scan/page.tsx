@@ -6,7 +6,9 @@ import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, CatalogueProject, Connector, ConnectorSchema, ConnectorScope, Scan } from "@/lib/types";
+import { useAppStore } from "@/store/appStore";
 
 const steps = ["Select sources", "Configure", "Running", "Results"];
 
@@ -41,6 +43,10 @@ export default function ScanPage() {
   const [projects, setProjects] = useState<CatalogueProject[]>([]);
   const [projectId, setProjectId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const user = useAppStore((state) => state.user);
+  const hydrate = useAppStore((state) => state.hydrate);
+  const canRunScan = hasPermission(user, "scan.run");
+  const canScheduleScan = hasPermission(user, "scan.schedule");
 
   const selectedConnectors = useMemo(
     () => connectors.filter((connector) => selectedIds.includes(connector.id)),
@@ -49,6 +55,7 @@ export default function ScanPage() {
   const selectedProject = projects.find((project) => project.id === projectId);
 
   useEffect(() => {
+    hydrate();
     api
       .get<ApiResponse<Connector[]>>("/api/v1/connectors")
       .then((response) => {
@@ -70,7 +77,7 @@ export default function ScanPage() {
         }
       })
       .catch(() => setProjects([]));
-  }, []);
+  }, [hydrate]);
 
   const loadConnectorSchemas = useCallback(async (connectorId: string) => {
     setLoadingSchemas((current) => ({ ...current, [connectorId]: true }));
@@ -392,9 +399,11 @@ export default function ScanPage() {
               />
               Notify on completion
             </label>
-            <Button type="button" disabled={!selectedIds.length || !scheduleCron.trim()} onClick={saveSchedule}>
-              Save schedule
-            </Button>
+            {canScheduleScan ? (
+              <Button type="button" disabled={!selectedIds.length || !scheduleCron.trim()} onClick={saveSchedule}>
+                Save schedule
+              </Button>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -447,7 +456,7 @@ export default function ScanPage() {
       <div className="flex gap-2">
         {activeStep > 0 && activeStep < 3 ? <Button type="button" onClick={() => setActiveStep(activeStep - 1)}>Back</Button> : null}
         {activeStep === 0 ? <Button type="button" variant="primary" disabled={!selectedIds.length} onClick={() => setActiveStep(1)}>Continue</Button> : null}
-        {activeStep === 1 ? <Button type="button" variant="primary" disabled={!selectedIds.length} onClick={runScan}>Start scan</Button> : null}
+        {activeStep === 1 && canRunScan ? <Button type="button" variant="primary" disabled={!selectedIds.length} onClick={runScan}>Start scan</Button> : null}
       </div>
 
       <RecentAuditLog eventType="scan" title="Recent scan audit log" />

@@ -1,12 +1,11 @@
 import { create } from "zustand";
 
-export type Role = "admin" | "editor" | "viewer";
-
 export type CurrentUser = {
   id: string;
   email: string;
   fullName: string;
-  role: Role;
+  role: string;
+  permissions: string[];
 };
 
 type AppState = {

@@ -20,7 +20,11 @@ class ModuleDatabase:
 
 
 MODULE_DATABASES = {
-    "admin": ModuleDatabase("admin", settings.admin_database_url, ("users", "connectors", "scans", "notification_settings")),
+    "admin": ModuleDatabase(
+        "admin",
+        settings.admin_database_url,
+        ("roles", "role_permissions", "users", "connectors", "scans", "notification_settings"),
+    ),
     "catalogue": ModuleDatabase(
         "catalogue",
         settings.catalogue_database_url,
@@ -117,6 +121,7 @@ def ensure_sqlite_performance_indexes() -> None:
         "admin": [
             "create index if not exists ix_scans_status_created_at on scans (status, created_at)",
             "create index if not exists ix_notification_settings_channel_enabled on notification_settings (channel, enabled)",
+            "create index if not exists ix_role_permissions_role_key on role_permissions (role_id, permission_key)",
         ],
         "catalogue": [
             "create index if not exists ix_assets_deleted_name on assets (deleted_at, name)",

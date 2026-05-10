@@ -9,6 +9,7 @@ from app.models.lineage import LineageEdge
 from app.models.notification import NotificationSetting
 from app.models.policy import ClassificationAssignment, ClassificationLabel, Policy
 from app.models.project import CatalogueProject, ProjectCategory
+from app.models.role import Role, RolePermission
 from app.models.scan import Scan
 from app.models.user import User
 
@@ -27,6 +28,8 @@ __all__ = [
     "NotificationSetting",
     "Policy",
     "ProjectCategory",
+    "Role",
+    "RolePermission",
     "Scan",
     "User",
 ]

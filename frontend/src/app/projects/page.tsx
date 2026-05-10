@@ -7,7 +7,9 @@ import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, CatalogueProject } from "@/lib/types";
+import { useAppStore } from "@/store/appStore";
 
 function codeFromName(value: string) {
   return value.trim().toLowerCase().replace(/[^0-9a-zA-Z]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
@@ -21,6 +23,11 @@ export default function ProjectsPage() {
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [message, setMessage] = useState("");
+  const user = useAppStore((state) => state.user);
+  const hydrate = useAppStore((state) => state.hydrate);
+  const canCreateProject = hasPermission(user, "projects.create");
+  const canDisableProject = hasPermission(user, "projects.disable");
+  const canManageCategories = hasPermission(user, "projects.manage_categories");
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? projects[0],
@@ -44,6 +51,7 @@ export default function ProjectsPage() {
   }
 
   useEffect(() => {
+    hydrate();
     api
       .get<ApiResponse<CatalogueProject[]>>("/api/v1/projects", { params: { include_inactive: true } })
       .then((response) => {
@@ -53,7 +61,7 @@ export default function ProjectsPage() {
         }
       })
       .catch(() => setMessage("Unable to load projects"));
-  }, []);
+  }, [hydrate]);
 
   async function createProject() {
     if (!projectName.trim()) {
@@ -130,7 +138,9 @@ export default function ProjectsPage() {
 
       {message ? <div className="text-[12px] text-[var(--color-brand)]">{message}</div> : null}
 
+      {(canCreateProject || canManageCategories) ? (
       <section className="grid grid-cols-[1fr_1fr] gap-4">
+        {canCreateProject ? (
         <div className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
           <h2 className="m-0 text-[15px] font-medium">Create project</h2>
           <div className="mt-4 grid gap-3">
@@ -158,7 +168,9 @@ export default function ProjectsPage() {
             </Button>
           </div>
         </div>
+        ) : null}
 
+        {canManageCategories ? (
         <div className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
           <h2 className="m-0 text-[15px] font-medium">Create category</h2>
           <div className="mt-4 grid gap-3">
@@ -198,7 +210,9 @@ export default function ProjectsPage() {
             </Button>
           </div>
         </div>
+        ) : null}
       </section>
+      ) : null}
 
       <DataTable headers={["Project", "Code", "Assets", "Categories", "Status", "Action"]}>
         {projects.map((project) => (
@@ -209,12 +223,14 @@ export default function ProjectsPage() {
             <td className="px-4 py-3 text-[12px]">{project.categories.length}</td>
             <td className="px-4 py-3 text-[12px] capitalize">{project.status}</td>
             <td className="px-4 py-3">
-              <button
-                className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
-                onClick={() => toggleProjectStatus(project)}
-              >
-                {project.status === "active" ? "Disable" : "Enable"}
-              </button>
+              {canDisableProject ? (
+                <button
+                  className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                  onClick={() => toggleProjectStatus(project)}
+                >
+                  {project.status === "active" ? "Disable" : "Enable"}
+                </button>
+              ) : null}
             </td>
           </tr>
         ))}
@@ -236,12 +252,14 @@ export default function ProjectsPage() {
               <td className="px-4 py-3 text-[12px]">{category.asset_count}</td>
               <td className="px-4 py-3 text-[12px] capitalize">{category.status}</td>
               <td className="px-4 py-3">
-                <button
-                  className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
-                  onClick={() => toggleCategoryStatus(category.id, category.status)}
-                >
-                  {category.status === "active" ? "Disable" : "Enable"}
-                </button>
+                {canManageCategories ? (
+                  <button
+                    className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                    onClick={() => toggleCategoryStatus(category.id, category.status)}
+                  >
+                    {category.status === "active" ? "Disable" : "Enable"}
+                  </button>
+                ) : null}
               </td>
             </tr>
           ))}

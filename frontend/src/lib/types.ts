@@ -2,8 +2,29 @@ export type User = {
   id: string;
   email: string;
   full_name: string;
-  role: "admin" | "editor" | "viewer";
+  role: string;
   is_active: boolean;
+  permissions: string[];
+};
+
+export type PermissionDefinition = {
+  key: string;
+  label: string;
+};
+
+export type PermissionGroup = {
+  module: string;
+  permissions: PermissionDefinition[];
+};
+
+export type RoleDefinition = {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  is_system: boolean;
+  is_active: boolean;
+  permissions: string[];
 };
 
 export type Connector = {

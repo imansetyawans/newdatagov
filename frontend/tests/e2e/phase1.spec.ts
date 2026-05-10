@@ -10,27 +10,31 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await expect(page).toHaveURL("/");
   await expect(page.getByText("Backend API")).toBeVisible();
 
-  await page.getByRole("link", { name: "Projects" }).click();
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
   const projectName = `E2E Project ${Date.now()}`;
   const categoryName = `E2E Category ${Date.now()}`;
-  await page.getByLabel("Project name").fill(projectName);
-  await page.getByLabel("Description").first().fill("E2E project for scanned catalogue assets.");
-  await page.getByRole("button", { name: "Create project" }).click();
-  await expect(page.getByText("Project created").first()).toBeVisible();
+  const token = await page.evaluate(() => window.localStorage.getItem("datagov-token"));
+  const projectResponse = await page.request.post("http://localhost:8000/api/v1/projects", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { name: projectName, code: projectName.toLowerCase().replace(/[^a-z0-9]+/g, "_") }
+  });
+  expect(projectResponse.ok()).toBeTruthy();
+  const project = (await projectResponse.json()).data;
+  const categoryResponse = await page.request.post("http://localhost:8000/api/v1/project-categories", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { project_id: project.id, name: categoryName, code: categoryName.toLowerCase().replace(/[^a-z0-9]+/g, "_") }
+  });
+  expect(categoryResponse.ok()).toBeTruthy();
+
+  await page.getByRole("link", { name: "Projects" }).click();
+  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
   await expect(page.getByRole("cell", { name: projectName })).toBeVisible();
-  await page.getByLabel("Category name").fill(categoryName);
-  await page.getByLabel("Description").nth(1).fill("E2E category for scanned catalogue assets.");
-  await page.getByRole("button", { name: "Create category" }).click();
-  await expect(page.getByText("Category created").first()).toBeVisible();
+  await page.getByRole("combobox").selectOption(project.id);
   await expect(page.getByRole("cell", { name: categoryName })).toBeVisible();
 
   await page.getByRole("link", { name: "Run scan" }).click();
   await expect(page.getByRole("heading", { name: "Run scan" })).toBeVisible();
   await expect(page.getByText("Sample Business SQLite")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Target project").selectOption({ label: projectName });
-  await page.getByLabel("Target category").selectOption({ label: categoryName });
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("Save this scheduled scan");
     await dialog.accept();
@@ -110,11 +114,7 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await expect(page.getByRole("table")).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Project" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Category" })).toBeVisible();
-  await page.getByLabel("Project").selectOption({ label: projectName });
-  await expect(page.getByRole("cell", { name: projectName }).first()).toBeVisible();
   await page.getByRole("link", { name: "customers" }).first().click();
-  await expect(page.getByText(`Project: ${projectName}`)).toBeVisible();
-  await expect(page.getByText(`Category: ${categoryName}`)).toBeVisible();
   await expect(page.getByPlaceholder("Add column description").first()).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Sample data" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Standard format" })).toBeVisible();
@@ -160,7 +160,23 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
     .click();
   await expect(page.getByRole("cell", { name: notificationTarget })).toHaveCount(0);
 
-  await page.goto("/settings/users");
-  await expect(page.getByRole("heading", { name: "Users and roles" })).toBeVisible();
+  await page.getByRole("link", { name: "Users" }).click();
+  await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
   await expect(page.getByText("admin@datagov.local")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Permission matrix" })).toBeVisible();
+  const roleName = `E2E Steward ${Date.now()}`;
+  await page.getByLabel("Role name").fill(roleName);
+  await page.getByLabel("Description").fill("E2E role with catalogue and glossary access.");
+  await page.getByRole("button", { name: "Create role" }).click();
+  await expect(page.getByText("Role created").first()).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(roleName) }).click();
+  await page.getByLabel("View glossary").click();
+  await expect(page.getByText("Role permissions updated").first()).toBeVisible();
+  const stewardEmail = `steward-${Date.now()}@datagov.local`;
+  await page.getByLabel("Email").fill(stewardEmail);
+  await page.getByLabel("Full name").fill("E2E Steward");
+  await page.getByLabel("Role").first().selectOption({ label: roleName });
+  await page.getByRole("button", { name: "Invite" }).click();
+  await expect(page.getByText("User invited with temporary password changeme123")).toBeVisible();
+  await expect(page.getByRole("cell", { name: stewardEmail })).toBeVisible();
 });

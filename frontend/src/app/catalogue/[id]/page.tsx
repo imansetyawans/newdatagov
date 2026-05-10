@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { DataTable } from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
+import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, Asset, CatalogueProject, Column } from "@/lib/types";
+import { useAppStore } from "@/store/appStore";
 
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
@@ -21,8 +23,14 @@ export default function AssetDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [detectingFormats, setDetectingFormats] = useState(false);
   const [columnSamples, setColumnSamples] = useState<Record<string, unknown[]>>({});
+  const user = useAppStore((state) => state.user);
+  const hydrate = useAppStore((state) => state.hydrate);
+  const canEditMetadata = hasPermission(user, "catalogue.edit_metadata");
+  const canGenerateMetadata = hasPermission(user, "catalogue.generate_metadata");
+  const canAssignProject = hasPermission(user, "catalogue.assign_project");
 
   useEffect(() => {
+    hydrate();
     api
       .get<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`)
       .then((response) => {
@@ -48,7 +56,7 @@ export default function AssetDetailPage() {
       .get<ApiResponse<CatalogueProject[]>>("/api/v1/projects")
       .then((response) => setProjects(response.data.data))
       .catch(() => setProjects([]));
-  }, [params.id]);
+  }, [hydrate, params.id]);
 
   const selectedProject = projects.find((project) => project.id === projectId);
 
@@ -172,20 +180,24 @@ export default function AssetDetailPage() {
           <p className="mt-1 font-mono text-[11px] text-[var(--color-text-secondary)]">{asset.source_path}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            className="rounded-[7px] border border-[var(--color-border)] px-4 py-2 text-[13px] font-medium text-[var(--color-text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={detectStandardFormats}
-            disabled={detectingFormats || !(asset.columns ?? []).length}
-          >
-            {detectingFormats ? "Detecting formats" : "Detect formats"}
-          </button>
-          <button
-            className="rounded-[7px] bg-[var(--color-brand)] px-4 py-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={generateMetadata}
-            disabled={generating || !(asset.columns ?? []).length}
-          >
-            {generating ? "Generating metadata" : "Generate metadata"}
-          </button>
+          {canEditMetadata ? (
+            <button
+              className="rounded-[7px] border border-[var(--color-border)] px-4 py-2 text-[13px] font-medium text-[var(--color-text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={detectStandardFormats}
+              disabled={detectingFormats || !(asset.columns ?? []).length}
+            >
+              {detectingFormats ? "Detecting formats" : "Detect formats"}
+            </button>
+          ) : null}
+          {canGenerateMetadata ? (
+            <button
+              className="rounded-[7px] bg-[var(--color-brand)] px-4 py-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={generateMetadata}
+              disabled={generating || !(asset.columns ?? []).length}
+            >
+              {generating ? "Generating metadata" : "Generate metadata"}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -199,9 +211,11 @@ export default function AssetDetailPage() {
               onChange={(event) => setDescription(event.target.value)}
             />
           </label>
-          <button className="mt-3 rounded-[7px] bg-[var(--color-brand)] px-3 py-2 text-[13px] font-medium text-white" onClick={saveDescription}>
-            Save description
-          </button>
+          {canEditMetadata ? (
+            <button className="mt-3 rounded-[7px] bg-[var(--color-brand)] px-3 py-2 text-[13px] font-medium text-white" onClick={saveDescription}>
+              Save description
+            </button>
+          ) : null}
           {message ? <span className="ml-3 text-[12px] text-[var(--color-brand)]">{message}</span> : null}
         </div>
         <div className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
@@ -217,6 +231,7 @@ export default function AssetDetailPage() {
         </div>
       </section>
 
+      {canAssignProject ? (
       <section className="grid grid-cols-[260px_260px_auto_1fr] items-end gap-3 rounded-[8px] border border-[var(--color-border)] bg-white p-4">
         <label className="grid gap-1.5 text-[12px] font-medium">
           Project
@@ -257,6 +272,7 @@ export default function AssetDetailPage() {
         </button>
         <div className="text-[12px] text-[var(--color-text-muted)]">Project/category controls where this asset appears in the catalogue.</div>
       </section>
+      ) : null}
 
       <DataTable headers={["Column", "Type", "Description", "Sample data", "Standard format", "Classifications", "Completeness", "Uniqueness", "Consistency", "Accuracy", "Action"]}>
         {(asset.columns ?? []).map((column) => (
@@ -315,12 +331,14 @@ export default function AssetDetailPage() {
             <td className="px-4 py-3 text-[12px]">{formatScore(column.consistency_score)}</td>
             <td className="px-4 py-3 text-[12px]">{formatScore(column.accuracy_score)}</td>
             <td className="px-4 py-3">
-              <button
-                className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
-                onClick={() => saveColumnDescription(column)}
-              >
-                Save
-              </button>
+              {canEditMetadata ? (
+                <button
+                  className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                  onClick={() => saveColumnDescription(column)}
+                >
+                  Save
+                </button>
+              ) : null}
             </td>
           </tr>
         ))}

@@ -20,6 +20,7 @@ from app.database import (
 )
 from app.main import app
 from app.models import Connector, User
+from app.services.access_control import ensure_default_roles
 from app.services.classification_service import ensure_default_classification_labels
 from app.utils.security import hash_password
 
@@ -49,6 +50,7 @@ def client() -> Generator[TestClient, None, None]:
         sessionmakers[key] = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
     with sessionmakers["admin"]() as db:
+        ensure_default_roles(db)
         db.add(
             User(
                 email="admin@test.local",

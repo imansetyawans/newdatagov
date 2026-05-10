@@ -1,24 +1,34 @@
 "use client";
 
-import { BookOpen, Database, FolderKanban, GitBranch, LayoutDashboard, Search, Settings, ShieldCheck } from "lucide-react";
+import { BookOpen, Database, FolderKanban, GitBranch, LayoutDashboard, Search, Settings, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 import { UserFooter } from "@/components/layout/UserFooter";
+import { hasPermission } from "@/lib/permissions";
+import { useAppStore } from "@/store/appStore";
 
 const navItems = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Catalogue", href: "/catalogue", icon: Database },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Quality", href: "/quality", icon: Search },
-  { label: "Policies", href: "/governance", icon: ShieldCheck },
-  { label: "Glossary", href: "/governance/glossary", icon: BookOpen },
-  { label: "Lineage", href: "/lineage", icon: GitBranch },
-  { label: "Settings", href: "/settings/connectors", icon: Settings }
+  { label: "Dashboard", href: "/", icon: LayoutDashboard, permission: "dashboard.view" },
+  { label: "Catalogue", href: "/catalogue", icon: Database, permission: "catalogue.view" },
+  { label: "Projects", href: "/projects", icon: FolderKanban, permission: "projects.view" },
+  { label: "Quality", href: "/quality", icon: Search, permission: "quality.view" },
+  { label: "Policies", href: "/governance", icon: ShieldCheck, permission: "policies.view" },
+  { label: "Glossary", href: "/governance/glossary", icon: BookOpen, permission: "glossary.view" },
+  { label: "Lineage", href: "/lineage", icon: GitBranch, permission: "lineage.view" },
+  { label: "Users", href: "/users", icon: Users, permission: "users.view" },
+  { label: "Settings", href: "/settings/connectors", icon: Settings, permission: "connectors.view" }
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const user = useAppStore((state) => state.user);
+  const hydrate = useAppStore((state) => state.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
 
   return (
     <aside className="min-h-screen border-r border-[var(--color-border)] bg-white">
@@ -37,7 +47,7 @@ export function Sidebar() {
           <div className="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--color-text-muted)]">
             Workspace
           </div>
-          {navItems.map((item) => {
+          {navItems.filter((item) => hasPermission(user, item.permission)).map((item) => {
             const Icon = item.icon;
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
