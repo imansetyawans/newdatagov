@@ -22,8 +22,8 @@ type LoginResponse = {
 
 export default function LoginPage() {
   const setSession = useAppStore((state) => state.setSession);
-  const [email, setEmail] = useState("admin@datagov.local");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -77,6 +77,7 @@ export default function LoginPage() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
+            placeholder="name@datagov.local"
             required
           />
         </label>
@@ -89,6 +90,7 @@ export default function LoginPage() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
+            placeholder="Password"
             required
           />
         </label>

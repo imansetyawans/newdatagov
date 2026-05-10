@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, catalogue, settings", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL("/login");
+  await expect(page.getByLabel("Email")).toHaveValue("");
+  await expect(page.getByLabel("Password")).toHaveValue("");
   await page.getByLabel("Email").fill("admin@datagov.local");
   await page.getByLabel("Password").fill("admin123");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -179,4 +181,9 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await page.getByRole("button", { name: "Invite" }).click();
   await expect(page.getByText("User invited with temporary password changeme123")).toBeVisible();
   await expect(page.getByRole("cell", { name: stewardEmail })).toBeVisible();
+
+  await page.getByRole("button", { name: "Logout" }).click();
+  await expect(page).toHaveURL("/login");
+  await expect(page.getByLabel("Email")).toHaveValue("");
+  await expect(page.getByLabel("Password")).toHaveValue("");
 });

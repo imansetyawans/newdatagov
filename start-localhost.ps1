@@ -134,7 +134,7 @@ if ($backendReady -and $frontendReady) {
     Write-Host "DataGov localhost is active."
     Write-Host "Frontend: $FrontendUrl"
     Write-Host "Backend:  $BackendUrl"
-    Write-Host "Login:    admin@datagov.local / admin123"
+    Write-Host "Login with your configured DataGov account."
 }
 else {
     Write-Host "One or more services did not become ready. Check backend/frontend logs if the page does not load."
