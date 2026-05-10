@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Database, GitBranch, LayoutDashboard, Search, Settings, ShieldCheck } from "lucide-react";
+import { BookOpen, Database, FolderKanban, GitBranch, LayoutDashboard, Search, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { UserFooter } from "@/components/layout/UserFooter";
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Catalogue", href: "/catalogue", icon: Database },
+  { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Quality", href: "/quality", icon: Search },
   { label: "Policies", href: "/governance", icon: ShieldCheck },
   { label: "Glossary", href: "/governance/glossary", icon: BookOpen },

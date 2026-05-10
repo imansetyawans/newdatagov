@@ -19,6 +19,8 @@ def run_scan(
     audit_db: Session,
     scan: Scan,
     scan_scopes: dict[str, dict] | None = None,
+    project_id: str | None = None,
+    category_id: str | None = None,
 ) -> Scan:
     scan.status = "running"
     scan.started_at = datetime.utcnow()
@@ -49,6 +51,8 @@ def run_scan(
                     connector_id=connector.id,
                     discovered=discovered,
                     scanned_at=scanned_at,
+                    project_id=project_id,
+                    category_id=category_id,
                 )
                 assets_scanned += 1
                 columns_scanned += column_count

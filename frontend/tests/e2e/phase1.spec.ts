@@ -10,10 +10,27 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await expect(page).toHaveURL("/");
   await expect(page.getByText("Backend API")).toBeVisible();
 
+  await page.getByRole("link", { name: "Projects" }).click();
+  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
+  const projectName = `E2E Project ${Date.now()}`;
+  const categoryName = `E2E Category ${Date.now()}`;
+  await page.getByLabel("Project name").fill(projectName);
+  await page.getByLabel("Description").first().fill("E2E project for scanned catalogue assets.");
+  await page.getByRole("button", { name: "Create project" }).click();
+  await expect(page.getByText("Project created").first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: projectName })).toBeVisible();
+  await page.getByLabel("Category name").fill(categoryName);
+  await page.getByLabel("Description").nth(1).fill("E2E category for scanned catalogue assets.");
+  await page.getByRole("button", { name: "Create category" }).click();
+  await expect(page.getByText("Category created").first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: categoryName })).toBeVisible();
+
   await page.getByRole("link", { name: "Run scan" }).click();
   await expect(page.getByRole("heading", { name: "Run scan" })).toBeVisible();
   await expect(page.getByText("Sample Business SQLite")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByLabel("Target project").selectOption({ label: projectName });
+  await page.getByLabel("Target category").selectOption({ label: categoryName });
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("Save this scheduled scan");
     await dialog.accept();
@@ -91,7 +108,13 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await page.getByRole("link", { name: "Catalogue" }).click();
   await expect(page.getByRole("heading", { name: "Catalogue" })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Project" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Category" })).toBeVisible();
+  await page.getByLabel("Project").selectOption({ label: projectName });
+  await expect(page.getByRole("cell", { name: projectName }).first()).toBeVisible();
   await page.getByRole("link", { name: "customers" }).first().click();
+  await expect(page.getByText(`Project: ${projectName}`)).toBeVisible();
+  await expect(page.getByText(`Category: ${categoryName}`)).toBeVisible();
   await expect(page.getByPlaceholder("Add column description").first()).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Sample data" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Standard format" })).toBeVisible();
@@ -113,8 +136,6 @@ test("Phase 3 happy path: login, scan, quality, glossary, lineage, policies, cat
   await page.getByRole("button", { name: "Generate metadata" }).click();
   await expect(page.getByText(/Generated metadata with/)).toBeVisible();
   await expect(page.getByPlaceholder("Add column description").first()).not.toHaveValue("");
-  await page.getByRole("button", { name: "Preview sample" }).click();
-  await expect(page.getByText("Sample loaded")).toBeVisible();
 
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Connectors" })).toBeVisible();

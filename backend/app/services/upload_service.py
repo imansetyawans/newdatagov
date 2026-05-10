@@ -173,6 +173,8 @@ def upsert_uploaded_asset(
     table_name: str,
     table_description: str | None,
     parsed: ParsedDataset,
+    project_id: str | None = None,
+    category_id: str | None = None,
 ) -> Asset:
     source_path = f"upload.{schema_name}.{table_name}"
     scanned_at = datetime.utcnow()
@@ -184,9 +186,13 @@ def upsert_uploaded_asset(
             source_path=source_path,
             asset_type="table",
             schema_name=schema_name,
+            project_id=project_id,
+            category_id=category_id,
         )
         catalogue_db.add(asset)
 
+    asset.project_id = project_id
+    asset.category_id = category_id
     asset.description = table_description or asset.description
     asset.row_count = len(parsed.rows)
     asset.last_scanned_at = scanned_at

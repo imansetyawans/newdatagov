@@ -14,15 +14,36 @@ from app.schemas.catalogue import (
     AssetSampleResponse,
     AssetRead,
     AssetUpdate,
+    CatalogueProjectCreate,
+    CatalogueProjectUpdate,
+    CategoryListResponse,
+    CategoryResponse,
     ColumnListResponse,
     ColumnMetadataGenerationResponse,
     ColumnRead,
     ColumnResponse,
     ColumnUpdate,
+    ProjectCategoryCreate,
+    ProjectCategoryUpdate,
+    ProjectListResponse,
+    ProjectResponse,
 )
 from app.services.catalogue_service import get_asset, list_assets, update_asset
 from app.services.audit_service import write_audit_log
 from app.services.metadata_ai_service import generate_column_descriptions
+from app.services.project_service import (
+    category_to_read,
+    create_category,
+    create_project,
+    get_category,
+    get_project,
+    list_categories,
+    list_projects,
+    project_to_read,
+    update_category,
+    update_project,
+    validate_project_category,
+)
 from app.services.upload_service import infer_standard_format
 
 
@@ -35,11 +56,154 @@ def assets(
     source: str | None = None,
     type: str | None = Query(default=None),
     owner: str | None = None,
+    project_id: str | None = None,
+    category_id: str | None = None,
+    unassigned: bool = False,
     db: Session = Depends(get_catalogue_db),
     _: User = Depends(get_current_user),
 ) -> AssetListResponse:
-    data = list_assets(db=db, q=q, source=source, asset_type=type, owner_id=owner)
+    data = list_assets(
+        db=db,
+        q=q,
+        source=source,
+        asset_type=type,
+        owner_id=owner,
+        project_id=project_id,
+        category_id=category_id,
+        unassigned=unassigned,
+    )
     return AssetListResponse(data=[AssetRead.model_validate(asset) for asset in data], meta={"count": len(data)})
+
+
+@router.get("/projects", response_model=ProjectListResponse)
+def projects(
+    include_inactive: bool = False,
+    db: Session = Depends(get_catalogue_db),
+    _: User = Depends(get_current_user),
+) -> ProjectListResponse:
+    data = [
+        project_to_read(db, project, include_inactive_categories=include_inactive)
+        for project in list_projects(db, include_inactive=include_inactive)
+    ]
+    return ProjectListResponse(data=data, meta={"count": len(data)})
+
+
+@router.post("/projects", response_model=ProjectResponse)
+def project_create(
+    payload: CatalogueProjectCreate,
+    db: Session = Depends(get_catalogue_db),
+    audit_db: Session = Depends(get_audit_db),
+    user: User = Depends(require_roles(["admin", "editor"])),
+) -> ProjectResponse:
+    project = create_project(db, payload)
+    write_audit_log(
+        audit_db,
+        user,
+        action="catalogue_project_created",
+        resource_type="catalogue_project",
+        resource_id=project.id,
+        event_type="catalogue",
+        metadata={"name": project.name, "code": project.code},
+    )
+    audit_db.commit()
+    return ProjectResponse(data=project_to_read(db, project), meta={})
+
+
+@router.get("/projects/{project_id}", response_model=ProjectResponse)
+def project_detail(
+    project_id: str,
+    db: Session = Depends(get_catalogue_db),
+    _: User = Depends(get_current_user),
+) -> ProjectResponse:
+    project = get_project(db, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    return ProjectResponse(data=project_to_read(db, project), meta={})
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectResponse)
+def project_update(
+    project_id: str,
+    payload: CatalogueProjectUpdate,
+    db: Session = Depends(get_catalogue_db),
+    audit_db: Session = Depends(get_audit_db),
+    user: User = Depends(require_roles(["admin", "editor"])),
+) -> ProjectResponse:
+    project = get_project(db, project_id)
+    if project is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    updated = update_project(db, project, payload)
+    write_audit_log(
+        audit_db,
+        user,
+        action="catalogue_project_updated",
+        resource_type="catalogue_project",
+        resource_id=updated.id,
+        event_type="catalogue",
+        metadata={"name": updated.name, "status": updated.status},
+    )
+    audit_db.commit()
+    return ProjectResponse(data=project_to_read(db, updated), meta={})
+
+
+@router.get("/project-categories", response_model=CategoryListResponse)
+def categories(
+    project_id: str | None = None,
+    include_inactive: bool = False,
+    db: Session = Depends(get_catalogue_db),
+    _: User = Depends(get_current_user),
+) -> CategoryListResponse:
+    data = [category_to_read(db, category) for category in list_categories(db, project_id, include_inactive)]
+    return CategoryListResponse(data=data, meta={"count": len(data)})
+
+
+@router.post("/project-categories", response_model=CategoryResponse)
+def category_create(
+    payload: ProjectCategoryCreate,
+    db: Session = Depends(get_catalogue_db),
+    audit_db: Session = Depends(get_audit_db),
+    user: User = Depends(require_roles(["admin", "editor"])),
+) -> CategoryResponse:
+    project = get_project(db, payload.project_id)
+    if project is None or project.status != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Project is not available")
+    category = create_category(db, payload)
+    write_audit_log(
+        audit_db,
+        user,
+        action="project_category_created",
+        resource_type="project_category",
+        resource_id=category.id,
+        event_type="catalogue",
+        metadata={"name": category.name, "project_id": category.project_id},
+    )
+    audit_db.commit()
+    return CategoryResponse(data=category_to_read(db, category), meta={})
+
+
+@router.patch("/project-categories/{category_id}", response_model=CategoryResponse)
+def category_update(
+    category_id: str,
+    payload: ProjectCategoryUpdate,
+    db: Session = Depends(get_catalogue_db),
+    audit_db: Session = Depends(get_audit_db),
+    user: User = Depends(require_roles(["admin", "editor"])),
+) -> CategoryResponse:
+    category = get_category(db, category_id)
+    if category is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+    updated = update_category(db, category, payload)
+    write_audit_log(
+        audit_db,
+        user,
+        action="project_category_updated",
+        resource_type="project_category",
+        resource_id=updated.id,
+        event_type="catalogue",
+        metadata={"name": updated.name, "status": updated.status},
+    )
+    audit_db.commit()
+    return CategoryResponse(data=category_to_read(db, updated), meta={})
 
 
 @router.get("/assets/{asset_id}", response_model=AssetDetailResponse)
@@ -65,6 +229,10 @@ def asset_update(
     asset = get_asset(db, asset_id)
     if asset is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+    try:
+        validate_project_category(db, payload.project_id, payload.category_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     updated_asset = update_asset(db, asset, payload)
     write_audit_log(
         audit_db,
@@ -73,7 +241,11 @@ def asset_update(
         resource_type="asset",
         resource_id=asset.id,
         event_type="catalogue",
-        metadata={"name": asset.name},
+        metadata={
+            "name": asset.name,
+            "project_id": updated_asset.project_id,
+            "category_id": updated_asset.category_id,
+        },
     )
     audit_db.commit()
     return AssetDetailResponse(data=updated_asset, meta={})

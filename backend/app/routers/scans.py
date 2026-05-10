@@ -19,6 +19,7 @@ from app.models import Scan, User
 from app.schemas.scan import ScanCreate, ScanListResponse, ScanRead, ScanResponse, ScheduledScanCreate, ScheduledScanUpdate
 from app.services.audit_service import write_audit_log
 from app.services.notification_service import dispatch_notifications
+from app.services.project_service import validate_project_category
 from app.services.scan_service import run_scan
 
 
@@ -121,6 +122,10 @@ def create_scan(
     audit_db: Session = Depends(get_audit_db),
     user: User = Depends(require_roles(["admin", "editor"])),
 ) -> ScanResponse:
+    try:
+        validate_project_category(catalogue_db, payload.project_id, payload.category_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     scan = Scan(connector_ids=payload.connector_ids, scan_type=payload.scan_type)
     admin_db.add(scan)
     admin_db.commit()
@@ -134,6 +139,8 @@ def create_scan(
         audit_db=audit_db,
         scan=scan,
         scan_scopes=payload.connector_scopes,
+        project_id=payload.project_id,
+        category_id=payload.category_id,
     )
     write_audit_log(
         audit_db,
@@ -147,6 +154,8 @@ def create_scan(
             "assets_scanned": scan.assets_scanned,
             "columns_scanned": scan.columns_scanned,
             "policies_applied": scan.policies_applied,
+            "project_id": payload.project_id,
+            "category_id": payload.category_id,
         },
     )
     notification_count = dispatch_notifications(

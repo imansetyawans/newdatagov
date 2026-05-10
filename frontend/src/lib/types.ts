@@ -48,11 +48,36 @@ export type Asset = {
   source_path: string;
   asset_type: string;
   schema_name: string | null;
+  project_id: string | null;
+  category_id: string | null;
+  project_name: string | null;
+  category_name: string | null;
   description: string | null;
   row_count: number | null;
   dq_score: number | null;
   last_scanned_at: string | null;
   columns?: Column[];
+};
+
+export type ProjectCategory = {
+  id: string;
+  project_id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  status: string;
+  asset_count: number;
+};
+
+export type CatalogueProject = {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  owner_id: string | null;
+  status: string;
+  asset_count: number;
+  categories: ProjectCategory[];
 };
 
 export type Scan = {

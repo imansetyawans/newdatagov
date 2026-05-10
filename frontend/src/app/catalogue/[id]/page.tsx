@@ -6,12 +6,15 @@ import { useEffect, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { DataTable } from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
-import type { ApiResponse, Asset, Column } from "@/lib/types";
+import type { ApiResponse, Asset, CatalogueProject, Column } from "@/lib/types";
 
 export default function AssetDetailPage() {
   const params = useParams<{ id: string }>();
   const [asset, setAsset] = useState<Asset | null>(null);
+  const [projects, setProjects] = useState<CatalogueProject[]>([]);
   const [description, setDescription] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [columnStandardFormats, setColumnStandardFormats] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
@@ -25,6 +28,8 @@ export default function AssetDetailPage() {
       .then((response) => {
         setAsset(response.data.data);
         setDescription(response.data.data.description ?? "");
+        setProjectId(response.data.data.project_id ?? "");
+        setCategoryId(response.data.data.category_id ?? "");
         setColumnDescriptions(
           Object.fromEntries((response.data.data.columns ?? []).map((column) => [column.id, column.description ?? ""]))
         );
@@ -39,12 +44,30 @@ export default function AssetDetailPage() {
         setColumnSamples((response.data.meta.column_samples as Record<string, unknown[]> | undefined) ?? {});
       })
       .catch(() => setColumnSamples({}));
+    api
+      .get<ApiResponse<CatalogueProject[]>>("/api/v1/projects")
+      .then((response) => setProjects(response.data.data))
+      .catch(() => setProjects([]));
   }, [params.id]);
+
+  const selectedProject = projects.find((project) => project.id === projectId);
 
   async function saveDescription() {
     const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, { description });
     setAsset(response.data.data);
     setMessage("Saved");
+    window.setTimeout(() => setMessage(""), 1800);
+  }
+
+  async function saveAssignment() {
+    const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, {
+      project_id: projectId,
+      category_id: categoryId
+    });
+    setAsset(response.data.data);
+    setProjectId(response.data.data.project_id ?? "");
+    setCategoryId(response.data.data.category_id ?? "");
+    setMessage("Assignment saved");
     window.setTimeout(() => setMessage(""), 1800);
   }
 
@@ -184,12 +207,55 @@ export default function AssetDetailPage() {
         <div className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
           <div className="text-[10px] font-medium uppercase tracking-[0.05em] text-[var(--color-text-muted)]">Summary</div>
           <div className="mt-3 grid gap-2 text-[12px]">
+            <div>Project: {asset.project_name ?? "Unassigned"}</div>
+            <div>Category: {asset.category_name ?? "-"}</div>
             <div>Type: <span className="capitalize">{asset.asset_type}</span></div>
             <div>Rows: {asset.row_count ?? "-"}</div>
             <div>Columns: {asset.columns?.length ?? 0}</div>
             <div>DQ score: {asset.dq_score ?? "-"}</div>
           </div>
         </div>
+      </section>
+
+      <section className="grid grid-cols-[260px_260px_auto_1fr] items-end gap-3 rounded-[8px] border border-[var(--color-border)] bg-white p-4">
+        <label className="grid gap-1.5 text-[12px] font-medium">
+          Project
+          <select
+            className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+            value={projectId}
+            onChange={(event) => {
+              const nextProject = projects.find((project) => project.id === event.target.value);
+              setProjectId(event.target.value);
+              setCategoryId(nextProject?.categories[0]?.id ?? "");
+            }}
+          >
+            <option value="">Unassigned</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-[12px] font-medium">
+          Category
+          <select
+            className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+            disabled={!selectedProject}
+          >
+            <option value="">No category</option>
+            {(selectedProject?.categories ?? []).map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="h-9 rounded-[7px] bg-[var(--color-brand)] px-3 text-[13px] font-medium text-white"
+          onClick={saveAssignment}
+        >
+          Save assignment
+        </button>
+        <div className="text-[12px] text-[var(--color-text-muted)]">Project/category controls where this asset appears in the catalogue.</div>
       </section>
 
       <DataTable headers={["Column", "Type", "Description", "Sample data", "Standard format", "Classifications", "Completeness", "Uniqueness", "Consistency", "Accuracy", "Action"]}>

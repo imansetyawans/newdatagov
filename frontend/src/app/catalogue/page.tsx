@@ -8,11 +8,15 @@ import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
-import type { ApiResponse, Asset } from "@/lib/types";
+import type { ApiResponse, Asset, CatalogueProject } from "@/lib/types";
 
 export default function CataloguePage() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [projects, setProjects] = useState<CatalogueProject[]>([]);
   const [query, setQuery] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [showUnassigned, setShowUnassigned] = useState(false);
   const [message, setMessage] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -20,22 +24,48 @@ export default function CataloguePage() {
   const [schemaName, setSchemaName] = useState("uploaded");
   const [tableName, setTableName] = useState("");
   const [tableDescription, setTableDescription] = useState("");
+  const [uploadProjectId, setUploadProjectId] = useState("");
+  const [uploadCategoryId, setUploadCategoryId] = useState("");
+
+  const activeFilterProject = projects.find((project) => project.id === projectFilter);
+  const uploadProject = projects.find((project) => project.id === uploadProjectId);
 
   const loadAssets = useCallback(async (search = query) => {
     try {
-      const response = await api.get<ApiResponse<Asset[]>>("/api/v1/assets", { params: { q: search || undefined } });
+      const response = await api.get<ApiResponse<Asset[]>>("/api/v1/assets", {
+        params: {
+          q: search || undefined,
+          project_id: projectFilter || undefined,
+          category_id: categoryFilter || undefined,
+          unassigned: showUnassigned || undefined
+        }
+      });
       setAssets(response.data.data);
     } catch {
       setMessage("Unable to load catalogue");
     }
-  }, [query]);
+  }, [query, projectFilter, categoryFilter, showUnassigned]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadAssets(query);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [query, loadAssets]);
+  }, [query, projectFilter, categoryFilter, showUnassigned, loadAssets]);
+
+  useEffect(() => {
+    api
+      .get<ApiResponse<CatalogueProject[]>>("/api/v1/projects")
+      .then((response) => {
+        setProjects(response.data.data);
+        if (!uploadProjectId && response.data.data.length) {
+          setUploadProjectId(response.data.data[0].id);
+          setUploadCategoryId(response.data.data[0].categories[0]?.id ?? "");
+        }
+      })
+      .catch(() => setProjects([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function inferTableName(file: File) {
     const baseName = file.name.replace(/\.(csv|xlsx)$/i, "");
@@ -50,8 +80,8 @@ export default function CataloguePage() {
   }
 
   async function uploadDataset() {
-    if (!uploadFile || !schemaName.trim() || !tableName.trim()) {
-      setMessage("Choose a file, schema name, and table name before upload");
+    if (!uploadFile || !schemaName.trim() || !tableName.trim() || !uploadProjectId || !uploadCategoryId) {
+      setMessage("Choose a file, schema, table, project, and category before upload");
       return;
     }
     const confirmed = window.confirm(
@@ -67,6 +97,8 @@ export default function CataloguePage() {
     formData.append("file", uploadFile);
     formData.append("schema_name", schemaName.trim());
     formData.append("table_name", tableName.trim());
+    formData.append("project_id", uploadProjectId);
+    formData.append("category_id", uploadCategoryId);
     if (tableDescription.trim()) {
       formData.append("description", tableDescription.trim());
     }
@@ -110,6 +142,58 @@ export default function CataloguePage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
+      </section>
+
+      <section className="grid grid-cols-[220px_220px_auto_1fr] items-end gap-3 rounded-[8px] border border-[var(--color-border)] bg-white p-3">
+        <label className="grid gap-1.5 text-[12px] font-medium">
+          Project
+          <select
+            className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+            value={projectFilter}
+            onChange={(event) => {
+              setProjectFilter(event.target.value);
+              setCategoryFilter("");
+              setShowUnassigned(false);
+            }}
+          >
+            <option value="">All projects</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-[12px] font-medium">
+          Category
+          <select
+            className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setShowUnassigned(false);
+            }}
+            disabled={!projectFilter}
+          >
+            <option value="">All categories</option>
+            {(activeFilterProject?.categories ?? []).map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex h-9 items-center gap-2 text-[12px]">
+          <input
+            type="checkbox"
+            checked={showUnassigned}
+            onChange={(event) => {
+              setShowUnassigned(event.target.checked);
+              if (event.target.checked) {
+                setProjectFilter("");
+                setCategoryFilter("");
+              }
+            }}
+          />
+          Unassigned only
+        </label>
+        <div className="text-right text-[12px] text-[var(--color-text-muted)]">{assets.length} asset(s)</div>
       </section>
 
       {message ? <div className="text-[12px] text-[var(--color-danger-text)]">{message}</div> : null}
@@ -161,6 +245,37 @@ export default function CataloguePage() {
                   />
                 </label>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="grid gap-1.5 text-[12px] font-medium">
+                  Project
+                  <select
+                    className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+                    value={uploadProjectId}
+                    onChange={(event) => {
+                      const nextProject = projects.find((project) => project.id === event.target.value);
+                      setUploadProjectId(event.target.value);
+                      setUploadCategoryId(nextProject?.categories[0]?.id ?? "");
+                    }}
+                  >
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-1.5 text-[12px] font-medium">
+                  Category
+                  <select
+                    className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 text-[13px] font-normal"
+                    value={uploadCategoryId}
+                    onChange={(event) => setUploadCategoryId(event.target.value)}
+                    disabled={!uploadProject}
+                  >
+                    {(uploadProject?.categories ?? []).map((category) => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className="grid gap-1.5 text-[12px] font-medium">
                 Description
                 <textarea
@@ -182,12 +297,14 @@ export default function CataloguePage() {
         </div>
       ) : null}
 
-      <DataTable headers={["Asset", "Source", "Type", "Rows", "DQ score", "Last scanned"]}>
+      <DataTable headers={["Asset", "Project", "Category", "Source", "Type", "Rows", "DQ score", "Last scanned"]}>
         {assets.map((asset) => (
           <tr key={asset.id} className="border-b border-[#F1F5F9] last:border-0">
             <td className="px-4 py-3 text-[12px] font-medium">
               <Link className="text-[var(--color-brand)]" href={`/catalogue/${asset.id}`}>{asset.name}</Link>
             </td>
+            <td className="px-4 py-3 text-[12px]">{asset.project_name ?? "Unassigned"}</td>
+            <td className="px-4 py-3 text-[12px]">{asset.category_name ?? "-"}</td>
             <td className="px-4 py-3 font-mono text-[11px] text-[var(--color-text-secondary)]">{asset.source_path}</td>
             <td className="px-4 py-3 text-[12px] capitalize">{asset.asset_type}</td>
             <td className="px-4 py-3 text-[12px]">{asset.row_count ?? "-"}</td>
@@ -199,7 +316,7 @@ export default function CataloguePage() {
         ))}
         {!assets.length ? (
           <tr>
-            <td className="px-4 py-8 text-center text-[12px] text-[var(--color-text-muted)]" colSpan={6}>
+            <td className="px-4 py-8 text-center text-[12px] text-[var(--color-text-muted)]" colSpan={8}>
               No assets catalogued yet. Run a scan from the topbar.
             </td>
           </tr>

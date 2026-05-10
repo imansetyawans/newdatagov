@@ -8,6 +8,7 @@ from app.schemas.catalogue import AssetDetailResponse
 from app.services.audit_service import write_audit_log
 from app.services.metadata_ai_service import generate_column_descriptions
 from app.services.policy_engine import evaluate_policies
+from app.services.project_service import validate_project_category
 from app.services.upload_service import (
     calculate_uploaded_quality,
     normalize_identifier,
@@ -25,6 +26,8 @@ async def upload_dataset(
     schema_name: str = Form(...),
     table_name: str = Form(...),
     description: str | None = Form(default=None),
+    project_id: str | None = Form(default=None),
+    category_id: str | None = Form(default=None),
     catalogue_db: Session = Depends(get_catalogue_db),
     quality_db: Session = Depends(get_quality_db),
     policy_db: Session = Depends(get_policy_db),
@@ -45,6 +48,10 @@ async def upload_dataset(
     normalized_table = normalize_identifier(table_name)
     if not normalized_schema or not normalized_table:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Schema name and table name are required")
+    try:
+        validate_project_category(catalogue_db, project_id, category_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     asset = upsert_uploaded_asset(
         catalogue_db,
@@ -52,6 +59,8 @@ async def upload_dataset(
         table_name=normalized_table,
         table_description=description,
         parsed=parsed,
+        project_id=project_id,
+        category_id=category_id,
     )
     descriptions, provider = generate_column_descriptions(asset)
     updated_descriptions = 0
@@ -77,6 +86,8 @@ async def upload_dataset(
             "table_name": normalized_table,
             "rows": len(parsed.rows),
             "columns": len(parsed.headers),
+            "project_id": project_id,
+            "category_id": category_id,
         },
     )
     write_audit_log(

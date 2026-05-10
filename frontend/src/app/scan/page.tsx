@@ -6,7 +6,7 @@ import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { api } from "@/lib/api";
-import type { ApiResponse, Connector, ConnectorSchema, ConnectorScope, Scan } from "@/lib/types";
+import type { ApiResponse, CatalogueProject, Connector, ConnectorSchema, ConnectorScope, Scan } from "@/lib/types";
 
 const steps = ["Select sources", "Configure", "Running", "Results"];
 
@@ -38,11 +38,15 @@ export default function ScanPage() {
   const [connectorSchemas, setConnectorSchemas] = useState<Record<string, ConnectorSchema[]>>({});
   const [connectorScopes, setConnectorScopes] = useState<Record<string, ConnectorScope>>({});
   const [loadingSchemas, setLoadingSchemas] = useState<Record<string, boolean>>({});
+  const [projects, setProjects] = useState<CatalogueProject[]>([]);
+  const [projectId, setProjectId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
   const selectedConnectors = useMemo(
     () => connectors.filter((connector) => selectedIds.includes(connector.id)),
     [connectors, selectedIds]
   );
+  const selectedProject = projects.find((project) => project.id === projectId);
 
   useEffect(() => {
     api
@@ -56,6 +60,16 @@ export default function ScanPage() {
       .get<ApiResponse<Scan[]>>("/api/v1/scans/schedules")
       .then((response) => setScheduledScans(response.data.data))
       .catch(() => setScheduledScans([]));
+    api
+      .get<ApiResponse<CatalogueProject[]>>("/api/v1/projects")
+      .then((response) => {
+        setProjects(response.data.data);
+        if (response.data.data.length) {
+          setProjectId(response.data.data[0].id);
+          setCategoryId(response.data.data[0].categories[0]?.id ?? "");
+        }
+      })
+      .catch(() => setProjects([]));
   }, []);
 
   const loadConnectorSchemas = useCallback(async (connectorId: string) => {
@@ -151,6 +165,10 @@ export default function ScanPage() {
       setMessage("Select at least one schema table before starting the scan.");
       return;
     }
+    if (!projectId || !categoryId) {
+      setMessage("Choose a project and category before starting the scan.");
+      return;
+    }
     const confirmed = window.confirm(
       "Start scan for the selected connector scope? DataGov will store the selected schema/table metadata in its catalogue database."
     );
@@ -171,7 +189,9 @@ export default function ScanPage() {
       const response = await api.post<ApiResponse<Scan>>("/api/v1/scans", {
         connector_ids: selectedIds,
         scan_type: scanType,
-        connector_scopes: selectedScopes
+        connector_scopes: selectedScopes,
+        project_id: projectId,
+        category_id: categoryId
       });
       setScan(response.data.data);
       setMessage(
@@ -268,6 +288,41 @@ export default function ScanPage() {
               <div className="mt-1 text-[var(--color-text-muted)]">
                 Only selected schemas and tables are stored as active assets in the DataGov catalogue.
               </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-[260px_260px_1fr] gap-3 rounded-[8px] bg-[var(--color-surface)] p-3">
+            <label className="grid gap-2 text-[12px] font-medium">
+              Target project
+              <select
+                className="h-9 rounded-[7px] border border-[var(--color-border)] px-3"
+                value={projectId}
+                onChange={(event) => {
+                  const nextProject = projects.find((project) => project.id === event.target.value);
+                  setProjectId(event.target.value);
+                  setCategoryId(nextProject?.categories[0]?.id ?? "");
+                }}
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-[12px] font-medium">
+              Target category
+              <select
+                className="h-9 rounded-[7px] border border-[var(--color-border)] px-3"
+                value={categoryId}
+                onChange={(event) => setCategoryId(event.target.value)}
+                disabled={!selectedProject}
+              >
+                {(selectedProject?.categories ?? []).map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="self-end rounded-[8px] bg-white px-3 py-2 text-[12px] text-[var(--color-text-secondary)]">
+              Scanned assets will be written to this project/category in the catalogue database.
             </div>
           </div>
 

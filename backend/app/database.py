@@ -21,7 +21,11 @@ class ModuleDatabase:
 
 MODULE_DATABASES = {
     "admin": ModuleDatabase("admin", settings.admin_database_url, ("users", "connectors", "scans", "notification_settings")),
-    "catalogue": ModuleDatabase("catalogue", settings.catalogue_database_url, ("assets", "columns", "lineage_edges")),
+    "catalogue": ModuleDatabase(
+        "catalogue",
+        settings.catalogue_database_url,
+        ("catalogue_projects", "project_categories", "assets", "columns", "lineage_edges"),
+    ),
     "classification": ModuleDatabase(
         "classification",
         settings.classification_database_url,
@@ -81,6 +85,10 @@ def ensure_compatibility_columns() -> None:
                     "postgresql": "JSON NOT NULL DEFAULT '[]'::json",
                 },
             },
+            "assets": {
+                "project_id": {"sqlite": "VARCHAR(36)", "postgresql": "VARCHAR(36)"},
+                "category_id": {"sqlite": "VARCHAR(36)", "postgresql": "VARCHAR(36)"},
+            },
         },
         "classification": {
             "classification_labels": {
@@ -113,7 +121,9 @@ def ensure_sqlite_performance_indexes() -> None:
         "catalogue": [
             "create index if not exists ix_assets_deleted_name on assets (deleted_at, name)",
             "create index if not exists ix_assets_connector_source on assets (connector_id, source_path)",
+            "create index if not exists ix_assets_project_category on assets (project_id, category_id)",
             "create index if not exists ix_columns_asset_position on columns (asset_id, ordinal_position)",
+            "create index if not exists ix_project_categories_project_status on project_categories (project_id, status)",
         ],
         "quality": [
             "create index if not exists ix_dq_issues_status_created_at on dq_issues (status, created_at)",

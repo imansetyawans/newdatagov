@@ -596,7 +596,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "datagov-kanban-v10";
+    const STORAGE_KEY = "datagov-kanban-v11";
     const COLUMNS = [
       { id: "backlog", title: "Backlog" },
       { id: "ready", title: "Ready" },
@@ -935,6 +935,16 @@
         status: "done",
         refs: ["DEVPLAN 15", "DoD"],
         desc: "Write README setup, architecture notes, env vars, API docstrings, changelog, error boundaries, and standard error envelope."
+      },
+      {
+        id: "p45-project-catalogue-structure",
+        title: "Project and project category catalogue structure",
+        phase: "Phase 4.5",
+        module: "Catalogue",
+        priority: "Must",
+        status: "done",
+        refs: ["Catalogue improvement discussion", "Project/category governance"],
+        desc: "Add catalogue projects and per-project categories, asset assignment, catalogue filters, upload and scan assignment, Projects menu, audit logging, and smoke-test coverage."
       }
     ];
 

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import DateTime, JSON, String, Text
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -10,6 +10,7 @@ from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.column import Column
+    from app.models.project import CatalogueProject, ProjectCategory
 
 
 class Asset(TimestampMixin, Base):
@@ -21,6 +22,8 @@ class Asset(TimestampMixin, Base):
     source_path: Mapped[str] = mapped_column(String(512), index=True, nullable=False)
     asset_type: Mapped[str] = mapped_column(String(64), nullable=False, default="table")
     schema_name: Mapped[str | None] = mapped_column(String(255), index=True)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("catalogue_projects.id"), index=True)
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("project_categories.id"), index=True)
     description: Mapped[str | None] = mapped_column(Text)
     owner_id: Mapped[str | None] = mapped_column(String(36), index=True)
     tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
@@ -31,3 +34,13 @@ class Asset(TimestampMixin, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
 
     columns: Mapped[list["Column"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
+    project: Mapped["CatalogueProject | None"] = relationship("CatalogueProject", back_populates="assets")
+    category: Mapped["ProjectCategory | None"] = relationship("ProjectCategory", back_populates="assets")
+
+    @property
+    def project_name(self) -> str | None:
+        return self.project.name if self.project else None
+
+    @property
+    def category_name(self) -> str | None:
+        return self.category.name if self.category else None

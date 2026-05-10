@@ -14,8 +14,16 @@ def list_assets(
     source: str | None = None,
     asset_type: str | None = None,
     owner_id: str | None = None,
+    project_id: str | None = None,
+    category_id: str | None = None,
+    unassigned: bool = False,
 ) -> list[Asset]:
-    statement = select(Asset).where(Asset.deleted_at.is_(None)).order_by(Asset.name)
+    statement = (
+        select(Asset)
+        .options(selectinload(Asset.project), selectinload(Asset.category))
+        .where(Asset.deleted_at.is_(None))
+        .order_by(Asset.name)
+    )
     if q:
         like = f"%{q}%"
         statement = statement.where(
@@ -31,13 +39,19 @@ def list_assets(
         statement = statement.where(Asset.asset_type == asset_type)
     if owner_id:
         statement = statement.where(Asset.owner_id == owner_id)
+    if project_id:
+        statement = statement.where(Asset.project_id == project_id)
+    if category_id:
+        statement = statement.where(Asset.category_id == category_id)
+    if unassigned:
+        statement = statement.where(Asset.project_id.is_(None))
     return list(db.scalars(statement).all())
 
 
 def get_asset(db: Session, asset_id: str) -> Asset | None:
     return db.scalar(
         select(Asset)
-        .options(selectinload(Asset.columns))
+        .options(selectinload(Asset.columns), selectinload(Asset.project), selectinload(Asset.category))
         .where(Asset.id == asset_id, Asset.deleted_at.is_(None))
     )
 
@@ -49,6 +63,12 @@ def update_asset(db: Session, asset: Asset, payload: AssetUpdate) -> Asset:
         asset.owner_id = payload.owner_id
     if payload.tags is not None:
         asset.tags = payload.tags
+    if payload.project_id is not None:
+        asset.project_id = payload.project_id or None
+        if asset.project_id is None:
+            asset.category_id = None
+    if payload.category_id is not None:
+        asset.category_id = payload.category_id or None
     db.commit()
     db.refresh(asset)
     return asset
@@ -76,6 +96,8 @@ def upsert_discovered_asset(
     connector_id: str,
     discovered: DiscoveredAsset,
     scanned_at: datetime,
+    project_id: str | None = None,
+    category_id: str | None = None,
 ) -> tuple[Asset, int]:
     asset = db.scalar(
         select(Asset).where(
@@ -90,9 +112,14 @@ def upsert_discovered_asset(
             source_path=discovered.source_path,
             asset_type=discovered.asset_type,
             schema_name=discovered.schema_name,
+            project_id=project_id,
+            category_id=category_id,
         )
         db.add(asset)
 
+    if project_id is not None:
+        asset.project_id = project_id
+        asset.category_id = category_id
     asset.row_count = discovered.row_count
     asset.last_scanned_at = scanned_at
     asset.deleted_at = None

@@ -7,6 +7,8 @@ class ScanCreate(BaseModel):
     connector_ids: list[str]
     scan_type: str = "full"
     connector_scopes: dict[str, dict] = Field(default_factory=dict)
+    project_id: str | None = None
+    category_id: str | None = None
     dq_metrics: list[str] = Field(
         default_factory=lambda: ["completeness", "uniqueness", "consistency", "accuracy"]
     )

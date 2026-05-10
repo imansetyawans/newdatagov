@@ -8,6 +8,7 @@ from app.models.glossary import GlossaryTerm
 from app.models.lineage import LineageEdge
 from app.models.notification import NotificationSetting
 from app.models.policy import ClassificationAssignment, ClassificationLabel, Policy
+from app.models.project import CatalogueProject, ProjectCategory
 from app.models.scan import Scan
 from app.models.user import User
 
@@ -19,11 +20,13 @@ __all__ = [
     "ClassificationAssignment",
     "Column",
     "Connector",
+    "CatalogueProject",
     "DQIssue",
     "GlossaryTerm",
     "LineageEdge",
     "NotificationSetting",
     "Policy",
+    "ProjectCategory",
     "Scan",
     "User",
 ]
