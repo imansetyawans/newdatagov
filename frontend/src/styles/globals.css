@@ -72,6 +72,65 @@ a {
   outline-offset: 2px;
 }
 
+@keyframes datagov-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes datagov-fade-slide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes datagov-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.animate-datagov-spin {
+  animation: datagov-spin 0.75s linear infinite;
+}
+
+.animate-datagov-enter {
+  animation: datagov-fade-slide 0.18s ease-out both;
+}
+
+.datagov-progress {
+  position: relative;
+  overflow: hidden;
+}
+
+.datagov-progress::after {
+  animation: datagov-shimmer 1.35s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.72), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  width: 45%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 .skip-link {
   position: fixed;
   left: 16px;

@@ -4,7 +4,10 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
+import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, Asset, CatalogueProject, Column } from "@/lib/types";
@@ -20,8 +23,10 @@ export default function AssetDetailPage() {
   const [columnDescriptions, setColumnDescriptions] = useState<Record<string, string>>({});
   const [columnStandardFormats, setColumnStandardFormats] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
   const [generating, setGenerating] = useState(false);
   const [detectingFormats, setDetectingFormats] = useState(false);
+  const [savingAction, setSavingAction] = useState<string | null>(null);
   const [columnSamples, setColumnSamples] = useState<Record<string, unknown[]>>({});
   const user = useAppStore((state) => state.user);
   const hydrate = useAppStore((state) => state.hydrate);
@@ -45,7 +50,10 @@ export default function AssetDetailPage() {
           Object.fromEntries((response.data.data.columns ?? []).map((column) => [column.id, column.standard_format ?? ""]))
         );
       })
-      .catch(() => setMessage("Unable to load asset"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load asset");
+      });
     api
       .get<ApiResponse<Array<Record<string, unknown>>>>(`/api/v1/assets/${params.id}/sample`)
       .then((response) => {
@@ -61,43 +69,76 @@ export default function AssetDetailPage() {
   const selectedProject = projects.find((project) => project.id === projectId);
 
   async function saveDescription() {
-    const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, { description });
-    setAsset(response.data.data);
-    setMessage("Saved");
-    window.setTimeout(() => setMessage(""), 1800);
+    setSavingAction("description");
+    setMessageTone("info");
+    setMessage("Saving description");
+    try {
+      const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, { description });
+      setAsset(response.data.data);
+      setMessageTone("success");
+      setMessage("Description saved");
+      window.setTimeout(() => setMessage(""), 1800);
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to save description");
+    } finally {
+      setSavingAction(null);
+    }
   }
 
   async function saveAssignment() {
-    const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, {
-      project_id: projectId,
-      category_id: categoryId
-    });
-    setAsset(response.data.data);
-    setProjectId(response.data.data.project_id ?? "");
-    setCategoryId(response.data.data.category_id ?? "");
-    setMessage("Assignment saved");
-    window.setTimeout(() => setMessage(""), 1800);
+    setSavingAction("assignment");
+    setMessageTone("info");
+    setMessage("Saving assignment");
+    try {
+      const response = await api.patch<ApiResponse<Asset>>(`/api/v1/assets/${params.id}`, {
+        project_id: projectId,
+        category_id: categoryId
+      });
+      setAsset(response.data.data);
+      setProjectId(response.data.data.project_id ?? "");
+      setCategoryId(response.data.data.category_id ?? "");
+      setMessageTone("success");
+      setMessage("Assignment saved");
+      window.setTimeout(() => setMessage(""), 1800);
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to save assignment");
+    } finally {
+      setSavingAction(null);
+    }
   }
 
   async function saveColumnDescription(column: Column) {
-    const response = await api.patch<ApiResponse<Column>>(
-      `/api/v1/assets/${params.id}/columns/${column.id}`,
-      {
-        description: columnDescriptions[column.id] ?? "",
-        standard_format: columnStandardFormats[column.id] ?? ""
-      }
-    );
-    setAsset((current) => {
-      if (!current) {
-        return current;
-      }
-      return {
-        ...current,
-        columns: (current.columns ?? []).map((item) => (item.id === column.id ? response.data.data : item))
-      };
-    });
-    setMessage("Column metadata saved");
-    window.setTimeout(() => setMessage(""), 1800);
+    setSavingAction(`column-${column.id}`);
+    setMessageTone("info");
+    setMessage(`Saving ${column.name} metadata`);
+    try {
+      const response = await api.patch<ApiResponse<Column>>(
+        `/api/v1/assets/${params.id}/columns/${column.id}`,
+        {
+          description: columnDescriptions[column.id] ?? "",
+          standard_format: columnStandardFormats[column.id] ?? ""
+        }
+      );
+      setAsset((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          columns: (current.columns ?? []).map((item) => (item.id === column.id ? response.data.data : item))
+        };
+      });
+      setMessageTone("success");
+      setMessage("Column metadata saved");
+      window.setTimeout(() => setMessage(""), 1800);
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to save column metadata");
+    } finally {
+      setSavingAction(null);
+    }
   }
 
   async function generateMetadata() {
@@ -109,6 +150,7 @@ export default function AssetDetailPage() {
     }
 
     setGenerating(true);
+    setMessageTone("info");
     setMessage("Generating column metadata");
     try {
       const response = await api.post<ApiResponse<Asset>>(
@@ -122,8 +164,10 @@ export default function AssetDetailPage() {
         Object.fromEntries((response.data.data.columns ?? []).map((column) => [column.id, column.standard_format ?? ""]))
       );
       const provider = String(response.data.meta.provider ?? "local");
+      setMessageTone("success");
       setMessage(`Generated metadata with ${provider}`);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to generate metadata");
     } finally {
       setGenerating(false);
@@ -140,6 +184,7 @@ export default function AssetDetailPage() {
     }
 
     setDetectingFormats(true);
+    setMessageTone("info");
     setMessage("Detecting standard formats");
     try {
       const response = await api.post<ApiResponse<Asset>>(
@@ -150,8 +195,10 @@ export default function AssetDetailPage() {
         Object.fromEntries((response.data.data.columns ?? []).map((column) => [column.id, column.standard_format ?? ""]))
       );
       const updatedCount = Number(response.data.meta.updated_count ?? 0);
+      setMessageTone("success");
       setMessage(`Detected standard formats for ${updatedCount} columns`);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to detect standard formats");
     } finally {
       setDetectingFormats(false);
@@ -169,7 +216,11 @@ export default function AssetDetailPage() {
   }
 
   if (!asset) {
-    return <div className="text-[13px] text-[var(--color-text-secondary)]">{message || "Loading asset"}</div>;
+    return message ? (
+      <StatusMessage tone={messageTone}>{message}</StatusMessage>
+    ) : (
+      <LoadingState label="Loading asset" description="Opening table metadata and governed samples." />
+    );
   }
 
   return (
@@ -181,22 +232,25 @@ export default function AssetDetailPage() {
         </div>
         <div className="flex gap-2">
           {canEditMetadata ? (
-            <button
-              className="rounded-[7px] border border-[var(--color-border)] px-4 py-2 text-[13px] font-medium text-[var(--color-text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+            <Button
               onClick={detectStandardFormats}
+              isLoading={detectingFormats}
+              loadingText="Detecting formats"
               disabled={detectingFormats || !(asset.columns ?? []).length}
             >
-              {detectingFormats ? "Detecting formats" : "Detect formats"}
-            </button>
+              Detect formats
+            </Button>
           ) : null}
           {canGenerateMetadata ? (
-            <button
-              className="rounded-[7px] bg-[var(--color-brand)] px-4 py-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            <Button
+              variant="primary"
               onClick={generateMetadata}
+              isLoading={generating}
+              loadingText="Generating metadata"
               disabled={generating || !(asset.columns ?? []).length}
             >
-              {generating ? "Generating metadata" : "Generate metadata"}
-            </button>
+              Generate metadata
+            </Button>
           ) : null}
         </div>
       </section>
@@ -212,11 +266,17 @@ export default function AssetDetailPage() {
             />
           </label>
           {canEditMetadata ? (
-            <button className="mt-3 rounded-[7px] bg-[var(--color-brand)] px-3 py-2 text-[13px] font-medium text-white" onClick={saveDescription}>
+            <Button
+              className="mt-3"
+              variant="primary"
+              onClick={saveDescription}
+              isLoading={savingAction === "description"}
+              loadingText="Saving"
+            >
               Save description
-            </button>
+            </Button>
           ) : null}
-          {message ? <span className="ml-3 text-[12px] text-[var(--color-brand)]">{message}</span> : null}
+          {message ? <StatusMessage className="mt-3" tone={messageTone}>{message}</StatusMessage> : null}
         </div>
         <div className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
           <div className="text-[10px] font-medium uppercase tracking-[0.05em] text-[var(--color-text-muted)]">Summary</div>
@@ -264,12 +324,14 @@ export default function AssetDetailPage() {
             ))}
           </select>
         </label>
-        <button
-          className="h-9 rounded-[7px] bg-[var(--color-brand)] px-3 text-[13px] font-medium text-white"
+        <Button
+          variant="primary"
           onClick={saveAssignment}
+          isLoading={savingAction === "assignment"}
+          loadingText="Saving"
         >
           Save assignment
-        </button>
+        </Button>
         <div className="text-[12px] text-[var(--color-text-muted)]">Project/category controls where this asset appears in the catalogue.</div>
       </section>
       ) : null}
@@ -332,12 +394,14 @@ export default function AssetDetailPage() {
             <td className="px-4 py-3 text-[12px]">{formatScore(column.accuracy_score)}</td>
             <td className="px-4 py-3">
               {canEditMetadata ? (
-                <button
-                  className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                <Button
+                  className="min-h-7 px-3 py-1 text-[12px]"
                   onClick={() => saveColumnDescription(column)}
+                  isLoading={savingAction === `column-${column.id}`}
+                  loadingText="Saving"
                 >
                   Save
-                </button>
+                </Button>
               ) : null}
             </td>
           </tr>

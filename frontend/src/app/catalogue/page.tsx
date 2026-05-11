@@ -7,6 +7,7 @@ import { Upload } from "lucide-react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, Asset, CatalogueProject } from "@/lib/types";
@@ -20,6 +21,7 @@ export default function CataloguePage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -47,6 +49,7 @@ export default function CataloguePage() {
       });
       setAssets(response.data.data);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to load catalogue");
     }
   }, [query, projectFilter, categoryFilter, showUnassigned]);
@@ -90,6 +93,7 @@ export default function CataloguePage() {
 
   async function uploadDataset() {
     if (!uploadFile || !schemaName.trim() || !tableName.trim() || !uploadProjectId || !uploadCategoryId) {
+      setMessageTone("error");
       setMessage("Choose a file, schema, table, project, and category before upload");
       return;
     }
@@ -101,6 +105,7 @@ export default function CataloguePage() {
     }
 
     setUploading(true);
+    setMessageTone("info");
     setMessage("Processing uploaded dataset");
     const formData = new FormData();
     formData.append("file", uploadFile);
@@ -119,6 +124,7 @@ export default function CataloguePage() {
       setUploadOpen(false);
       setUploadFile(null);
       setTableDescription("");
+      setMessageTone("success");
       setMessage(`Uploaded ${response.data.data.name} with ${response.data.meta.columns ?? 0} columns`);
       await loadAssets();
       window.setTimeout(() => setMessage(""), 3000);
@@ -126,6 +132,7 @@ export default function CataloguePage() {
       const detail = typeof error === "object" && error && "response" in error
         ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
+      setMessageTone("error");
       setMessage(detail ?? "Unable to upload dataset");
     } finally {
       setUploading(false);
@@ -141,8 +148,7 @@ export default function CataloguePage() {
         </div>
         <div className="flex items-center gap-2">
           {canUpload ? (
-            <Button variant="primary" onClick={() => setUploadOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+            <Button variant="primary" icon={<Upload className="h-4 w-4" />} onClick={() => setUploadOpen(true)}>
               Upload dataset
             </Button>
           ) : null}
@@ -207,7 +213,7 @@ export default function CataloguePage() {
         <div className="text-right text-[12px] text-[var(--color-text-muted)]">{assets.length} asset(s)</div>
       </section>
 
-      {message ? <div className="text-[12px] text-[var(--color-danger-text)]">{message}</div> : null}
+      {message ? <StatusMessage tone={messageTone}>{message}</StatusMessage> : null}
 
       {uploadOpen ? (
         <div className="fixed inset-0 z-40 grid place-items-center bg-black/30 px-4">
@@ -300,8 +306,13 @@ export default function CataloguePage() {
 
             <div className="mt-5 flex justify-end gap-2">
               <Button onClick={() => setUploadOpen(false)} disabled={uploading}>Cancel</Button>
-              <Button variant="primary" onClick={uploadDataset} disabled={uploading}>
-                {uploading ? "Processing" : "Process upload"}
+              <Button
+                variant="primary"
+                onClick={uploadDataset}
+                isLoading={uploading}
+                loadingText="Processing"
+              >
+                Process upload
               </Button>
             </div>
           </section>

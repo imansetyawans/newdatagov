@@ -5,6 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { LoadingState } from "@/components/ui/LoadingState";
 import { useAppStore } from "@/store/appStore";
 
 const publicPaths = new Set(["/login"]);
@@ -52,11 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [hydrate, pathname, router]);
 
   if ((!hasToken && !isPublicPath) || (hasToken && pathname === "/login")) {
-    return (
-      <div className="grid min-h-screen place-items-center text-[13px] text-[var(--color-text-secondary)]">
-        Loading
-      </div>
-    );
+    return <LoadingState fullPage label="Checking session" description="Opening your DataGov workspace." />;
   }
 
   if (isPublicPath) {
@@ -71,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="min-w-0">
         <Topbar />
-        <main id="main-content" tabIndex={-1} className="p-6">
+        <main id="main-content" tabIndex={-1} className="animate-datagov-enter p-6">
           {children}
         </main>
       </div>

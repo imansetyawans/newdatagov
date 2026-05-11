@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { api } from "@/lib/api";
 import type { ApiResponse, Connector, NotificationSetting } from "@/lib/types";
@@ -17,6 +18,8 @@ export default function ConnectorsPage() {
   const [notificationChannel, setNotificationChannel] = useState("email");
   const [notificationTarget, setNotificationTarget] = useState("admin@datagov.local");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [actionKey, setActionKey] = useState<string | null>(null);
 
   async function loadConnectors() {
     const response = await api.get<ApiResponse<Connector[]>>("/api/v1/connectors");
@@ -40,6 +43,7 @@ export default function ConnectorsPage() {
       .catch(() => {
         if (mounted) {
           setMessage("Unable to load connectors");
+          setMessageTone("error");
         }
       });
     api
@@ -61,55 +65,133 @@ export default function ConnectorsPage() {
 
   async function addConnector(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await api.post("/api/v1/connectors", {
-      name,
-      connector_type: "sqlite",
-      config: { database_path: databasePath }
-    });
-    setMessage("Connector created");
-    await loadConnectors();
+    setActionKey("add-connector");
+    setMessageTone("info");
+    setMessage("Creating connector");
+    try {
+      await api.post("/api/v1/connectors", {
+        name,
+        connector_type: "sqlite",
+        config: { database_path: databasePath }
+      });
+      setMessageTone("success");
+      setMessage("Connector created");
+      await loadConnectors();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to create connector");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function addNotification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await api.post("/api/v1/notifications", {
-      channel: notificationChannel,
-      target: notificationTarget,
-      enabled: true,
-      events: ["scan_completed", "dq_issue_created"]
-    });
-    setMessage("Notification setting created");
-    await loadNotifications();
+    setActionKey("add-notification");
+    setMessageTone("info");
+    setMessage("Creating notification target");
+    try {
+      await api.post("/api/v1/notifications", {
+        channel: notificationChannel,
+        target: notificationTarget,
+        enabled: true,
+        events: ["scan_completed", "dq_issue_created"]
+      });
+      setMessageTone("success");
+      setMessage("Notification setting created");
+      await loadNotifications();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to create notification setting");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function toggleNotification(setting: NotificationSetting) {
-    await api.patch(`/api/v1/notifications/${setting.id}`, {
-      enabled: !setting.enabled
-    });
-    setMessage("Notification setting updated");
-    await loadNotifications();
+    setActionKey(`notification-toggle-${setting.id}`);
+    setMessageTone("info");
+    setMessage("Updating notification setting");
+    try {
+      await api.patch(`/api/v1/notifications/${setting.id}`, {
+        enabled: !setting.enabled
+      });
+      setMessageTone("success");
+      setMessage("Notification setting updated");
+      await loadNotifications();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to update notification setting");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function testNotification(setting: NotificationSetting) {
-    const response = await api.post<ApiResponse<{ success: boolean; message: string }>>(`/api/v1/notifications/${setting.id}/test`);
-    setMessage(response.data.data.message);
+    setActionKey(`notification-test-${setting.id}`);
+    setMessageTone("info");
+    setMessage("Testing notification");
+    try {
+      const response = await api.post<ApiResponse<{ success: boolean; message: string }>>(`/api/v1/notifications/${setting.id}/test`);
+      setMessageTone("success");
+      setMessage(response.data.data.message);
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to test notification");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function deleteNotification(setting: NotificationSetting) {
-    await api.delete(`/api/v1/notifications/${setting.id}`);
-    setMessage("Notification setting deleted");
-    await loadNotifications();
+    setActionKey(`notification-delete-${setting.id}`);
+    setMessageTone("info");
+    setMessage("Deleting notification setting");
+    try {
+      await api.delete(`/api/v1/notifications/${setting.id}`);
+      setMessageTone("success");
+      setMessage("Notification setting deleted");
+      await loadNotifications();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to delete notification setting");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function testConnector(connector: Connector) {
-    const response = await api.post<ApiResponse<{ success: boolean; error?: string }>>(`/api/v1/connectors/${connector.id}/test`);
-    setMessage(response.data.data.success ? "Connection test passed" : `Connection failed: ${response.data.data.error}`);
-    await loadConnectors();
+    setActionKey(`connector-test-${connector.id}`);
+    setMessageTone("info");
+    setMessage("Testing connector");
+    try {
+      const response = await api.post<ApiResponse<{ success: boolean; error?: string }>>(`/api/v1/connectors/${connector.id}/test`);
+      setMessageTone(response.data.data.success ? "success" : "error");
+      setMessage(response.data.data.success ? "Connection test passed" : `Connection failed: ${response.data.data.error}`);
+      await loadConnectors();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to test connector");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function deleteConnector(connector: Connector) {
-    await api.delete(`/api/v1/connectors/${connector.id}`);
-    await loadConnectors();
+    setActionKey(`connector-delete-${connector.id}`);
+    setMessageTone("info");
+    setMessage("Deleting connector");
+    try {
+      await api.delete(`/api/v1/connectors/${connector.id}`);
+      setMessageTone("success");
+      setMessage("Connector deleted");
+      await loadConnectors();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to delete connector");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   return (
@@ -128,10 +210,12 @@ export default function ConnectorsPage() {
           SQLite database path
           <input className="h-9 rounded-[7px] border border-[var(--color-border)] px-3 font-mono text-[12px]" value={databasePath} onChange={(event) => setDatabasePath(event.target.value)} required />
         </label>
-        <Button type="submit" variant="primary">Add connector</Button>
+        <Button type="submit" variant="primary" isLoading={actionKey === "add-connector"} loadingText="Adding">
+          Add connector
+        </Button>
       </form>
 
-      {message ? <div className="text-[12px] text-[var(--color-brand)]">{message}</div> : null}
+      {message ? <StatusMessage tone={messageTone}>{message}</StatusMessage> : null}
 
       <DataTable headers={["Name", "Type", "Status", "Path", "Actions"]} caption="Configured source connectors">
         {connectors.map((connector) => (
@@ -141,8 +225,23 @@ export default function ConnectorsPage() {
             <td className="px-4 py-3 text-[12px]"><StatusDot status={connector.status} /></td>
             <td className="px-4 py-3 font-mono text-[11px] text-[var(--color-text-secondary)]">{String(connector.config_encrypted.database_path ?? "")}</td>
             <td className="flex gap-2 px-4 py-3">
-              <Button type="button" onClick={() => testConnector(connector)}>Test</Button>
-              <Button type="button" variant="danger" onClick={() => deleteConnector(connector)}>Delete</Button>
+              <Button
+                type="button"
+                onClick={() => testConnector(connector)}
+                isLoading={actionKey === `connector-test-${connector.id}`}
+                loadingText="Testing"
+              >
+                Test
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => deleteConnector(connector)}
+                isLoading={actionKey === `connector-delete-${connector.id}`}
+                loadingText="Deleting"
+              >
+                Delete
+              </Button>
             </td>
           </tr>
         ))}
@@ -179,7 +278,9 @@ export default function ConnectorsPage() {
               required
             />
           </label>
-          <Button type="submit" variant="primary">Add notification</Button>
+          <Button type="submit" variant="primary" isLoading={actionKey === "add-notification"} loadingText="Adding">
+            Add notification
+          </Button>
         </form>
         <DataTable headers={["Channel", "Target", "Events", "Status", "Actions"]} caption="Notification settings">
           {notifications.map((setting) => (
@@ -189,9 +290,31 @@ export default function ConnectorsPage() {
               <td className="px-4 py-3 font-mono text-[11px]">{setting.events.join(", ")}</td>
               <td className="px-4 py-3 text-[12px]">{setting.enabled ? "Enabled" : "Disabled"}</td>
               <td className="flex gap-2 px-4 py-3">
-                <Button type="button" onClick={() => testNotification(setting)}>Test</Button>
-                <Button type="button" onClick={() => toggleNotification(setting)}>{setting.enabled ? "Disable" : "Enable"}</Button>
-                <Button type="button" variant="danger" onClick={() => deleteNotification(setting)}>Delete</Button>
+                <Button
+                  type="button"
+                  onClick={() => testNotification(setting)}
+                  isLoading={actionKey === `notification-test-${setting.id}`}
+                  loadingText="Testing"
+                >
+                  Test
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => toggleNotification(setting)}
+                  isLoading={actionKey === `notification-toggle-${setting.id}`}
+                  loadingText="Updating"
+                >
+                  {setting.enabled ? "Disable" : "Enable"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => deleteNotification(setting)}
+                  isLoading={actionKey === `notification-delete-${setting.id}`}
+                  loadingText="Deleting"
+                >
+                  Delete
+                </Button>
               </td>
             </tr>
           ))}

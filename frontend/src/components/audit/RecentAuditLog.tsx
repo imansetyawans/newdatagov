@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import type { ApiResponse, AuditLog } from "@/lib/types";
 
@@ -55,7 +56,7 @@ export function RecentAuditLog({ eventType, limit = 6, title = "Recent audit log
             <span className="capitalize text-[var(--color-text-secondary)]">{entry.event_type}</span>
           </div>
         ))}
-        {message ? <div className="text-[12px] text-[var(--color-text-muted)]">{message}</div> : null}
+        {message ? <StatusMessage>{message}</StatusMessage> : null}
       </div>
     </section>
   );

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
 import type { ApiResponse, CatalogueProject } from "@/lib/types";
@@ -23,6 +24,8 @@ export default function ProjectsPage() {
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [actionKey, setActionKey] = useState<string | null>(null);
   const user = useAppStore((state) => state.user);
   const hydrate = useAppStore((state) => state.hydrate);
   const canCreateProject = hasPermission(user, "projects.create");
@@ -46,6 +49,7 @@ export default function ProjectsPage() {
         setSelectedProjectId(response.data.data[0].id);
       }
     } catch {
+      setMessageTone("error");
       setMessage("Unable to load projects");
     }
   }
@@ -60,14 +64,21 @@ export default function ProjectsPage() {
           setSelectedProjectId(response.data.data[0].id);
         }
       })
-      .catch(() => setMessage("Unable to load projects"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load projects");
+      });
   }, [hydrate]);
 
   async function createProject() {
     if (!projectName.trim()) {
+      setMessageTone("error");
       setMessage("Project name is required");
       return;
     }
+    setActionKey("create-project");
+    setMessageTone("info");
+    setMessage("Creating project");
     try {
       const response = await api.post<ApiResponse<CatalogueProject>>("/api/v1/projects", {
         name: projectName.trim(),
@@ -77,18 +88,26 @@ export default function ProjectsPage() {
       setProjectName("");
       setProjectDescription("");
       setSelectedProjectId(response.data.data.id);
+      setMessageTone("success");
       setMessage("Project created");
       await loadProjects(response.data.data.id);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create project. Check if the code already exists.");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function createCategory() {
     if (!selectedProject || !categoryName.trim()) {
+      setMessageTone("error");
       setMessage("Choose a project and category name first");
       return;
     }
+    setActionKey("create-category");
+    setMessageTone("info");
+    setMessage("Creating category");
     try {
       await api.post("/api/v1/project-categories", {
         project_id: selectedProject.id,
@@ -98,32 +117,50 @@ export default function ProjectsPage() {
       });
       setCategoryName("");
       setCategoryDescription("");
+      setMessageTone("success");
       setMessage("Category created");
       await loadProjects();
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create category");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function toggleProjectStatus(project: CatalogueProject) {
     const nextStatus = project.status === "active" ? "inactive" : "active";
+    setActionKey(`project-${project.id}`);
+    setMessageTone("info");
+    setMessage("Updating project");
     try {
       await api.patch(`/api/v1/projects/${project.id}`, { status: nextStatus });
+      setMessageTone("success");
       setMessage(`Project ${nextStatus}`);
       await loadProjects();
     } catch {
+      setMessageTone("error");
       setMessage("Unable to update project");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function toggleCategoryStatus(categoryId: string, status: string) {
     const nextStatus = status === "active" ? "inactive" : "active";
+    setActionKey(`category-${categoryId}`);
+    setMessageTone("info");
+    setMessage("Updating category");
     try {
       await api.patch(`/api/v1/project-categories/${categoryId}`, { status: nextStatus });
+      setMessageTone("success");
       setMessage(`Category ${nextStatus}`);
       await loadProjects();
     } catch {
+      setMessageTone("error");
       setMessage("Unable to update category");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -136,7 +173,7 @@ export default function ProjectsPage() {
         </p>
       </section>
 
-      {message ? <div className="text-[12px] text-[var(--color-brand)]">{message}</div> : null}
+      {message ? <StatusMessage tone={messageTone}>{message}</StatusMessage> : null}
 
       {(canCreateProject || canManageCategories) ? (
       <section className="grid grid-cols-[1fr_1fr] gap-4">
@@ -162,8 +199,13 @@ export default function ProjectsPage() {
                 placeholder="Project business context"
               />
             </label>
-            <Button variant="primary" onClick={createProject}>
-              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            <Button
+              variant="primary"
+              icon={<Plus className="h-4 w-4" />}
+              isLoading={actionKey === "create-project"}
+              loadingText="Creating"
+              onClick={createProject}
+            >
               Create project
             </Button>
           </div>
@@ -204,8 +246,14 @@ export default function ProjectsPage() {
                 placeholder="Category purpose"
               />
             </label>
-            <Button variant="primary" onClick={createCategory} disabled={!projects.length}>
-              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+            <Button
+              variant="primary"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={createCategory}
+              disabled={!projects.length}
+              isLoading={actionKey === "create-category"}
+              loadingText="Creating"
+            >
               Create category
             </Button>
           </div>
@@ -224,12 +272,14 @@ export default function ProjectsPage() {
             <td className="px-4 py-3 text-[12px] capitalize">{project.status}</td>
             <td className="px-4 py-3">
               {canDisableProject ? (
-                <button
-                  className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                <Button
+                  className="min-h-7 px-3 py-1 text-[12px]"
                   onClick={() => toggleProjectStatus(project)}
+                  isLoading={actionKey === `project-${project.id}`}
+                  loadingText="Updating"
                 >
                   {project.status === "active" ? "Disable" : "Enable"}
-                </button>
+                </Button>
               ) : null}
             </td>
           </tr>
@@ -253,12 +303,14 @@ export default function ProjectsPage() {
               <td className="px-4 py-3 text-[12px] capitalize">{category.status}</td>
               <td className="px-4 py-3">
                 {canManageCategories ? (
-                  <button
-                    className="rounded-[7px] border border-[var(--color-border)] px-3 py-1 text-[12px] font-medium text-[var(--color-text-secondary)]"
+                  <Button
+                    className="min-h-7 px-3 py-1 text-[12px]"
                     onClick={() => toggleCategoryStatus(category.id, category.status)}
+                    isLoading={actionKey === `category-${category.id}`}
+                    loadingText="Updating"
                   >
                     {category.status === "active" ? "Disable" : "Enable"}
-                  </button>
+                  </Button>
                 ) : null}
               </td>
             </tr>

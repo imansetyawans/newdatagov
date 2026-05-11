@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import type { ApiResponse, PermissionGroup, RoleDefinition, User } from "@/lib/types";
 
@@ -23,6 +24,8 @@ export function UserManagementPage() {
   const [roleName, setRoleName] = useState("");
   const [roleDescription, setRoleDescription] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [actionKey, setActionKey] = useState<string | null>(null);
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.id === selectedRoleId) ?? roles[0],
@@ -58,11 +61,16 @@ export function UserManagementPage() {
         setSelectedRoleId(rolesResponse.data.data[0]?.id ?? "");
         setInviteRole(rolesResponse.data.data.find((role) => role.code === "viewer")?.code ?? rolesResponse.data.data[0]?.code ?? "");
       })
-      .catch(() => setMessage("Unable to load user management data"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load user management data");
+      });
   }, []);
 
   async function inviteUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setActionKey("invite-user");
+    setMessageTone("info");
     setMessage("");
     try {
       await api.post("/api/v1/users/invite", {
@@ -74,28 +82,47 @@ export function UserManagementPage() {
       setEmail("");
       setFullName("");
       setInviteRole("viewer");
+      setMessageTone("success");
       setMessage("User invited with temporary password changeme123");
       await loadIdentityData();
     } catch (error: unknown) {
       const detail = typeof error === "object" && error && "response" in error
         ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
+      setMessageTone("error");
       setMessage(detail ?? "Unable to invite user");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function updateUser(user: User, changes: Partial<User>) {
-    await api.patch(`/api/v1/users/${user.id}`, changes);
-    setMessage("User updated");
-    await loadIdentityData();
+    setActionKey(`user-${user.id}`);
+    setMessageTone("info");
+    setMessage("Updating user");
+    try {
+      await api.patch(`/api/v1/users/${user.id}`, changes);
+      setMessageTone("success");
+      setMessage("User updated");
+      await loadIdentityData();
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to update user");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function createRole(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!roleName.trim()) {
+      setMessageTone("error");
       setMessage("Role name is required");
       return;
     }
+    setActionKey("create-role");
+    setMessageTone("info");
+    setMessage("Creating role");
     try {
       const response = await api.post<ApiResponse<RoleDefinition>>("/api/v1/roles", {
         name: roleName.trim(),
@@ -105,17 +132,32 @@ export function UserManagementPage() {
       });
       setRoleName("");
       setRoleDescription("");
+      setMessageTone("success");
       setMessage("Role created");
       await loadIdentityData(response.data.data.id);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create role. Check if the role code already exists.");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function toggleRoleStatus(role: RoleDefinition) {
-    await api.patch(`/api/v1/roles/${role.id}`, { is_active: !role.is_active });
-    setMessage(`Role ${role.is_active ? "disabled" : "enabled"}`);
-    await loadIdentityData(role.id);
+    setActionKey(`role-status-${role.id}`);
+    setMessageTone("info");
+    setMessage("Updating role");
+    try {
+      await api.patch(`/api/v1/roles/${role.id}`, { is_active: !role.is_active });
+      setMessageTone("success");
+      setMessage(`Role ${role.is_active ? "disabled" : "enabled"}`);
+      await loadIdentityData(role.id);
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to update role");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   async function togglePermission(permissionKey: string) {
@@ -125,11 +167,22 @@ export function UserManagementPage() {
     const permissions = selectedRole.permissions.includes(permissionKey)
       ? selectedRole.permissions.filter((key) => key !== permissionKey)
       : [...selectedRole.permissions, permissionKey];
-    const response = await api.put<ApiResponse<RoleDefinition>>(`/api/v1/roles/${selectedRole.id}/permissions`, {
-      permissions
-    });
-    setRoles((current) => current.map((role) => (role.id === selectedRole.id ? response.data.data : role)));
-    setMessage("Role permissions updated");
+    setActionKey(`permission-${permissionKey}`);
+    setMessageTone("info");
+    setMessage("Updating role permissions");
+    try {
+      const response = await api.put<ApiResponse<RoleDefinition>>(`/api/v1/roles/${selectedRole.id}/permissions`, {
+        permissions
+      });
+      setRoles((current) => current.map((role) => (role.id === selectedRole.id ? response.data.data : role)));
+      setMessageTone("success");
+      setMessage("Role permissions updated");
+    } catch {
+      setMessageTone("error");
+      setMessage("Unable to update role permissions");
+    } finally {
+      setActionKey(null);
+    }
   }
 
   return (
@@ -141,7 +194,7 @@ export function UserManagementPage() {
         </p>
       </section>
 
-      {message ? <div className="text-[12px] text-[var(--color-brand)]">{message}</div> : null}
+      {message ? <StatusMessage tone={messageTone}>{message}</StatusMessage> : null}
 
       <form onSubmit={inviteUser} className="grid grid-cols-[1fr_1fr_180px_auto] items-end gap-3 rounded-[8px] border border-[var(--color-border)] bg-white p-4">
         <label className="grid gap-2 text-[12px] font-medium">
@@ -160,7 +213,9 @@ export function UserManagementPage() {
             ))}
           </select>
         </label>
-        <Button type="submit" variant="primary">Invite</Button>
+        <Button type="submit" variant="primary" isLoading={actionKey === "invite-user"} loadingText="Inviting">
+          Invite
+        </Button>
       </form>
 
       <DataTable headers={["Name", "Email", "Role", "Status", "Actions"]}>
@@ -169,7 +224,7 @@ export function UserManagementPage() {
             <td className="px-4 py-3 text-[12px] font-medium">{user.full_name}</td>
             <td className="px-4 py-3 text-[12px] text-[var(--color-text-secondary)]">{user.email}</td>
             <td className="px-4 py-3">
-              <select className="h-8 rounded-[7px] border border-[var(--color-border)] px-2 capitalize" value={user.role} onChange={(event) => updateUser(user, { role: event.target.value })}>
+              <select className="h-8 rounded-[7px] border border-[var(--color-border)] px-2 capitalize disabled:cursor-not-allowed disabled:opacity-50" value={user.role} disabled={actionKey === `user-${user.id}`} onChange={(event) => updateUser(user, { role: event.target.value })}>
                 {roles.filter((role) => role.is_active || role.code === user.role).map((role) => (
                   <option key={role.id} value={role.code}>{role.name}</option>
                 ))}
@@ -177,7 +232,12 @@ export function UserManagementPage() {
             </td>
             <td className="px-4 py-3 text-[12px]">{user.is_active ? "Active" : "Inactive"}</td>
             <td className="px-4 py-3">
-              <Button type="button" onClick={() => updateUser(user, { is_active: !user.is_active })}>
+              <Button
+                type="button"
+                onClick={() => updateUser(user, { is_active: !user.is_active })}
+                isLoading={actionKey === `user-${user.id}`}
+                loadingText="Updating"
+              >
                 {user.is_active ? "Deactivate" : "Activate"}
               </Button>
             </td>
@@ -197,7 +257,9 @@ export function UserManagementPage() {
               Description
               <textarea className="min-h-20 rounded-[7px] border border-[var(--color-border)] p-3" value={roleDescription} onChange={(event) => setRoleDescription(event.target.value)} placeholder="Role purpose" />
             </label>
-            <Button type="submit" variant="primary">Create role</Button>
+            <Button type="submit" variant="primary" isLoading={actionKey === "create-role"} loadingText="Creating">
+              Create role
+            </Button>
           </form>
           <div className="mt-4 grid gap-2">
             {roles.map((role) => (
@@ -228,7 +290,13 @@ export function UserManagementPage() {
               </p>
             </div>
             {selectedRole ? (
-              <Button type="button" onClick={() => toggleRoleStatus(selectedRole)} disabled={selectedRole.code === "admin"}>
+              <Button
+                type="button"
+                onClick={() => toggleRoleStatus(selectedRole)}
+                disabled={selectedRole.code === "admin"}
+                isLoading={actionKey === `role-status-${selectedRole.id}`}
+                loadingText="Updating"
+              >
                 {selectedRole.is_active ? "Disable role" : "Enable role"}
               </Button>
             ) : null}
@@ -243,7 +311,7 @@ export function UserManagementPage() {
                       <input
                         type="checkbox"
                         checked={Boolean(selectedRole?.permissions.includes(permission.key))}
-                        disabled={!selectedRole || selectedRole.code === "admin"}
+                        disabled={!selectedRole || selectedRole.code === "admin" || actionKey === `permission-${permission.key}`}
                         onChange={() => togglePermission(permission.key)}
                       />
                       <span>{permission.label}</span>

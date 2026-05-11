@@ -6,21 +6,28 @@ import { useEffect, useMemo, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import type { ApiResponse, LineageGraph } from "@/lib/types";
 
 export default function LineagePage() {
   const [graph, setGraph] = useState<LineageGraph>({ nodes: [], edges: [] });
   const [message, setMessage] = useState("Loading lineage graph");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [extracting, setExtracting] = useState(false);
 
   function loadLineage(nextMessage = "Lineage graph loaded") {
     api
       .get<ApiResponse<LineageGraph>>("/api/v1/lineage")
       .then((response) => {
         setGraph(response.data.data);
+        setMessageTone(nextMessage.includes("extracted") ? "success" : "info");
         setMessage(nextMessage);
       })
-      .catch(() => setMessage("Unable to load lineage graph"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load lineage graph");
+      });
   }
 
   useEffect(() => {
@@ -37,12 +44,17 @@ export default function LineagePage() {
     if (!confirmed) {
       return;
     }
+    setExtracting(true);
+    setMessageTone("info");
     setMessage("Extracting lineage");
     try {
       await api.post("/api/v1/lineage/extract");
       loadLineage("Lineage extracted");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to extract lineage");
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -55,7 +67,7 @@ export default function LineagePage() {
             Review table-level upstream and downstream relationships.
           </p>
         </div>
-        <Button type="button" variant="primary" onClick={extractLineage}>
+        <Button type="button" variant="primary" onClick={extractLineage} isLoading={extracting} loadingText="Extracting">
           Extract lineage
         </Button>
       </section>
@@ -93,7 +105,7 @@ export default function LineagePage() {
           <div className="mt-3 grid gap-2 text-[12px]">
             <div>Nodes: {graph.nodes.length}</div>
             <div>Edges: {graph.edges.length}</div>
-            <div>{message}</div>
+            <StatusMessage tone={messageTone}>{message}</StatusMessage>
           </div>
         </aside>
       </section>

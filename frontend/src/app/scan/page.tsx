@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { api } from "@/lib/api";
 import { hasPermission } from "@/lib/permissions";
@@ -43,6 +44,8 @@ export default function ScanPage() {
   const [projects, setProjects] = useState<CatalogueProject[]>([]);
   const [projectId, setProjectId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [runningAction, setRunningAction] = useState<string | null>(null);
   const user = useAppStore((state) => state.user);
   const hydrate = useAppStore((state) => state.hydrate);
   const canRunScan = hasPermission(user, "scan.run");
@@ -62,7 +65,10 @@ export default function ScanPage() {
         setConnectors(response.data.data);
         setSelectedIds(response.data.data.filter((connector) => connector.status !== "error").map((connector) => connector.id));
       })
-      .catch(() => setMessage("Unable to load connectors"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load connectors");
+      });
     api
       .get<ApiResponse<Scan[]>>("/api/v1/scans/schedules")
       .then((response) => setScheduledScans(response.data.data))
@@ -93,6 +99,7 @@ export default function ScanPage() {
         return { ...current, [connectorId]: scopeFromConnector(connector, schemas) };
       });
     } catch {
+      setMessageTone("error");
       setMessage("Unable to discover connector schemas. Check connector settings.");
     } finally {
       setLoadingSchemas((current) => ({ ...current, [connectorId]: false }));
@@ -169,10 +176,12 @@ export default function ScanPage() {
     const selectedScopes = scopesForSelectedConnectors();
     const totalTables = Object.values(selectedScopes).reduce((total, scope) => total + selectedTableCount(scope), 0);
     if (!totalTables) {
+      setMessageTone("error");
       setMessage("Select at least one schema table before starting the scan.");
       return;
     }
     if (!projectId || !categoryId) {
+      setMessageTone("error");
       setMessage("Choose a project and category before starting the scan.");
       return;
     }
@@ -180,10 +189,13 @@ export default function ScanPage() {
       "Start scan for the selected connector scope? DataGov will store the selected schema/table metadata in its catalogue database."
     );
     if (!confirmed) {
+      setMessageTone("info");
       setMessage("Scan cancelled");
       return;
     }
+    setRunningAction("run-scan");
     setActiveStep(2);
+    setMessageTone("info");
     setMessage("Saving connector scope and running scan");
     try {
       await Promise.all(
@@ -204,10 +216,14 @@ export default function ScanPage() {
       setMessage(
         `Scan complete. ${response.data.data.assets_scanned} scoped asset(s) catalogued, ${response.data.data.dq_issues_raised} issue(s) raised, and ${response.data.data.policies_applied} policy action(s) applied.`
       );
+      setMessageTone("success");
       setActiveStep(3);
     } catch {
+      setMessageTone("error");
       setMessage("Scan failed. Check connector settings and try again.");
       setActiveStep(1);
+    } finally {
+      setRunningAction(null);
     }
   }
 
@@ -215,6 +231,7 @@ export default function ScanPage() {
     const selectedScopes = scopesForSelectedConnectors();
     const totalTables = Object.values(selectedScopes).reduce((total, scope) => total + selectedTableCount(scope), 0);
     if (!totalTables) {
+      setMessageTone("error");
       setMessage("Select at least one schema table before saving the schedule.");
       return;
     }
@@ -222,6 +239,8 @@ export default function ScanPage() {
     if (!confirmed) {
       return;
     }
+    setRunningAction("save-schedule");
+    setMessageTone("info");
     setMessage("Saving connector scope and scheduled scan");
     try {
       await Promise.all(
@@ -238,9 +257,13 @@ export default function ScanPage() {
         notify_on_completion: notifyOnCompletion
       });
       setScheduledScans((current) => [response.data.data, ...current]);
+      setMessageTone("success");
       setMessage("Scheduled scan saved");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to save scheduled scan");
+    } finally {
+      setRunningAction(null);
     }
   }
 
@@ -400,7 +423,13 @@ export default function ScanPage() {
               Notify on completion
             </label>
             {canScheduleScan ? (
-              <Button type="button" disabled={!selectedIds.length || !scheduleCron.trim()} onClick={saveSchedule}>
+              <Button
+                type="button"
+                disabled={!selectedIds.length || !scheduleCron.trim()}
+                isLoading={runningAction === "save-schedule"}
+                loadingText="Saving"
+                onClick={saveSchedule}
+              >
                 Save schedule
               </Button>
             ) : null}
@@ -411,7 +440,7 @@ export default function ScanPage() {
       {activeStep === 2 ? (
         <section className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
           <div className="text-[13px] font-medium">Running scan</div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F1F5F9]">
+          <div className="datagov-progress mt-3 h-2 overflow-hidden rounded-full bg-[#F1F5F9]">
             <div className="h-full w-3/4 rounded-full bg-[var(--color-brand)]" />
           </div>
           <pre className="mt-4 rounded-[8px] bg-[var(--color-surface)] p-3 font-mono text-[12px]" aria-live="polite">
@@ -437,7 +466,7 @@ export default function ScanPage() {
         </section>
       ) : null}
 
-      {message ? <div className="text-[12px] text-[var(--color-brand)]">{message}</div> : null}
+      {message ? <StatusMessage tone={messageTone}>{message}</StatusMessage> : null}
 
       <section className="rounded-[8px] border border-[var(--color-border)] bg-white p-4">
         <div className="text-[13px] font-medium">Scheduled scans</div>
@@ -454,9 +483,20 @@ export default function ScanPage() {
       </section>
 
       <div className="flex gap-2">
-        {activeStep > 0 && activeStep < 3 ? <Button type="button" onClick={() => setActiveStep(activeStep - 1)}>Back</Button> : null}
+        {activeStep > 0 && activeStep < 3 ? <Button type="button" onClick={() => setActiveStep(activeStep - 1)} disabled={Boolean(runningAction)}>Back</Button> : null}
         {activeStep === 0 ? <Button type="button" variant="primary" disabled={!selectedIds.length} onClick={() => setActiveStep(1)}>Continue</Button> : null}
-        {activeStep === 1 && canRunScan ? <Button type="button" variant="primary" disabled={!selectedIds.length} onClick={runScan}>Start scan</Button> : null}
+        {activeStep === 1 && canRunScan ? (
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!selectedIds.length}
+            isLoading={runningAction === "run-scan"}
+            loadingText="Starting scan"
+            onClick={runScan}
+          >
+            Start scan
+          </Button>
+        ) : null}
       </div>
 
       <RecentAuditLog eventType="scan" title="Recent scan audit log" />

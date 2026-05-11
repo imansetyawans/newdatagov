@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import type { ApiResponse, GlossarySuggestion, GlossaryTerm } from "@/lib/types";
 
@@ -16,6 +17,8 @@ export default function GlossaryPage() {
   const [definition, setDefinition] = useState("");
   const [synonyms, setSynonyms] = useState("");
   const [message, setMessage] = useState("Loading glossary");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [actionKey, setActionKey] = useState<string | null>(null);
 
   function loadGlossary(nextMessage = "Glossary loaded") {
     Promise.all([
@@ -25,9 +28,13 @@ export default function GlossaryPage() {
       .then(([termResponse, suggestionResponse]) => {
         setTerms(termResponse.data.data);
         setSuggestions(suggestionResponse.data.data);
+        setMessageTone(nextMessage.includes("created") || nextMessage.includes("saved") ? "success" : "info");
         setMessage(nextMessage);
       })
-      .catch(() => setMessage("Unable to load glossary"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load glossary");
+      });
   }
 
   useEffect(() => {
@@ -43,6 +50,8 @@ export default function GlossaryPage() {
     if (!confirmed) {
       return;
     }
+    setActionKey("create-term");
+    setMessageTone("info");
     setMessage("Creating glossary term");
     try {
       await api.post<ApiResponse<GlossaryTerm>>("/api/v1/glossary", {
@@ -56,13 +65,17 @@ export default function GlossaryPage() {
       setSynonyms("");
       loadGlossary("Glossary term created");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create glossary term");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function approveSuggestion(suggestion: GlossarySuggestion) {
     const targetTerm = terms.find((item) => item.id === suggestion.term_id);
     if (!targetTerm) {
+      setMessageTone("error");
       setMessage("Glossary term not found for suggestion");
       return;
     }
@@ -78,6 +91,9 @@ export default function GlossaryPage() {
       suggestion.resource_type === "column"
         ? Array.from(new Set([...targetTerm.linked_column_ids, suggestion.resource_id]))
         : targetTerm.linked_column_ids;
+    setActionKey(`suggestion-${suggestion.resource_id}`);
+    setMessageTone("info");
+    setMessage("Saving glossary link");
     try {
       await api.patch<ApiResponse<GlossaryTerm>>(`/api/v1/glossary/${targetTerm.id}`, {
         linked_asset_ids,
@@ -85,7 +101,10 @@ export default function GlossaryPage() {
       });
       loadGlossary("Glossary link saved");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to save glossary link");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -133,11 +152,18 @@ export default function GlossaryPage() {
             Synonyms
             <input className="h-9 rounded-[7px] border border-[var(--color-border)] px-3" value={synonyms} onChange={(event) => setSynonyms(event.target.value)} />
           </label>
-          <Button type="button" variant="primary" disabled={!term.trim() || !definition.trim()} onClick={createTerm}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!term.trim() || !definition.trim()}
+            isLoading={actionKey === "create-term"}
+            loadingText="Creating"
+            onClick={createTerm}
+          >
             Create term
           </Button>
         </div>
-        <div className="mt-3 rounded-[8px] bg-[var(--color-surface)] px-3 py-2 text-[12px] text-[var(--color-text-secondary)]">{message}</div>
+        <StatusMessage className="mt-3" tone={messageTone}>{message}</StatusMessage>
       </section>
 
       <DataTable headers={["Term", "Definition", "Synonyms", "Status", "Links"]}>
@@ -159,7 +185,14 @@ export default function GlossaryPage() {
             <div key={`${suggestion.term_id}-${suggestion.resource_id}`} className="grid grid-cols-[1fr_120px_auto] items-center gap-3 rounded-[7px] bg-[var(--color-surface)] px-3 py-2 text-[12px]">
               <span>{suggestion.term} to {suggestion.resource_name}</span>
               <span>{Math.round(suggestion.confidence * 100)}%</span>
-              <Button type="button" onClick={() => approveSuggestion(suggestion)}>Link</Button>
+              <Button
+                type="button"
+                onClick={() => approveSuggestion(suggestion)}
+                isLoading={actionKey === `suggestion-${suggestion.resource_id}`}
+                loadingText="Saving"
+              >
+                Link
+              </Button>
             </div>
           ))}
           {!suggestions.length ? <div className="text-[12px] text-[var(--color-text-muted)]">No suggestions yet. Run a scan or add terms.</div> : null}

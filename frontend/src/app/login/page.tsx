@@ -97,8 +97,8 @@ export default function LoginPage() {
 
         {error ? <div className="mt-3 text-[11px] text-[var(--color-danger-text)]">{error}</div> : null}
 
-        <Button className="mt-5 w-full" type="submit" variant="primary" disabled={loading}>
-          {loading ? "Signing in" : "Sign in"}
+        <Button className="mt-5 w-full" type="submit" variant="primary" isLoading={loading} loadingText="Signing in">
+          Sign in
         </Button>
       </form>
     </div>

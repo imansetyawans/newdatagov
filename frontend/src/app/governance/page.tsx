@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { RecentAuditLog } from "@/components/audit/RecentAuditLog";
 import { Button } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
+import { StatusMessage } from "@/components/ui/StatusMessage";
 import { api } from "@/lib/api";
 import type { ApiResponse, ClassificationLabel, GovernanceCoverage, Policy } from "@/lib/types";
 
@@ -29,6 +30,8 @@ export default function GovernancePage() {
   const [newClassificationColor, setNewClassificationColor] = useState("danger");
   const [newClassificationMasksSamples, setNewClassificationMasksSamples] = useState(true);
   const [message, setMessage] = useState("Loading governance controls");
+  const [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info");
+  const [actionKey, setActionKey] = useState<string | null>(null);
 
   function loadGovernance(nextMessage = "Governance controls loaded") {
     Promise.all([
@@ -40,9 +43,13 @@ export default function GovernancePage() {
         setPolicies(policyResponse.data.data);
         setClassifications(classificationResponse.data.data);
         setCoverage(coverageResponse.data.data);
+        setMessageTone(nextMessage.includes("Unable") ? "error" : nextMessage.includes("loaded") ? "info" : "success");
         setMessage(nextMessage);
       })
-      .catch(() => setMessage("Unable to load governance controls"));
+      .catch(() => {
+        setMessageTone("error");
+        setMessage("Unable to load governance controls");
+      });
   }
 
   useEffect(() => {
@@ -54,6 +61,8 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey("create-policy");
+    setMessageTone("info");
     setMessage("Creating policy");
     try {
       await api.post<ApiResponse<Policy>>("/api/v1/policies", {
@@ -65,13 +74,17 @@ export default function GovernancePage() {
       });
       loadGovernance("Policy created. Run a scan to apply it.");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create policy");
+    } finally {
+      setActionKey(null);
     }
   }
 
   async function createClassification() {
     const name = newClassificationName.trim();
     if (!name) {
+      setMessageTone("error");
       setMessage("Classification name is required");
       return;
     }
@@ -79,6 +92,8 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey("create-classification");
+    setMessageTone("info");
     setMessage("Creating classification");
     try {
       await api.post<ApiResponse<ClassificationLabel>>("/api/v1/classifications", {
@@ -90,7 +105,10 @@ export default function GovernancePage() {
       setClassification(name);
       loadGovernance("Classification created. You can now use it in a policy.");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to create classification. Check if the name already exists.");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -102,6 +120,8 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey(`classification-mask-${label.id}`);
+    setMessageTone("info");
     setMessage("Updating classification");
     try {
       await api.patch<ApiResponse<ClassificationLabel>>(`/api/v1/classifications/${label.id}`, {
@@ -109,7 +129,10 @@ export default function GovernancePage() {
       });
       loadGovernance(`Classification ${nextMasksSamples ? "will mask samples" : "will not mask samples"}`);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to update classification");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -118,12 +141,17 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey(`classification-delete-${label.id}`);
+    setMessageTone("info");
     setMessage("Deleting classification");
     try {
       await api.delete(`/api/v1/classifications/${label.id}`);
       loadGovernance("Classification deleted");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to delete classification because it is still used");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -133,12 +161,17 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey(`policy-toggle-${policy.id}`);
+    setMessageTone("info");
     setMessage("Updating policy");
     try {
       await api.patch<ApiResponse<Policy>>(`/api/v1/policies/${policy.id}`, { status: nextStatus });
       loadGovernance(`Policy ${nextStatus}`);
     } catch {
+      setMessageTone("error");
       setMessage("Unable to update policy");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -147,12 +180,17 @@ export default function GovernancePage() {
     if (!confirmed) {
       return;
     }
+    setActionKey(`policy-delete-${policy.id}`);
+    setMessageTone("info");
     setMessage("Deleting policy");
     try {
       await api.delete(`/api/v1/policies/${policy.id}`);
       loadGovernance("Policy deleted");
     } catch {
+      setMessageTone("error");
       setMessage("Unable to delete policy");
+    } finally {
+      setActionKey(null);
     }
   }
 
@@ -228,7 +266,14 @@ export default function GovernancePage() {
             />
             Mask samples
           </label>
-          <Button type="button" variant="primary" disabled={!newClassificationName.trim()} onClick={createClassification}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!newClassificationName.trim()}
+            isLoading={actionKey === "create-classification"}
+            loadingText="Creating"
+            onClick={createClassification}
+          >
             Create classification
           </Button>
         </div>
@@ -241,10 +286,20 @@ export default function GovernancePage() {
             >
               <span>{label.name}</span>
               <span className="text-[var(--color-text-muted)]">{label.masks_samples ? "Masks samples" : "No masking"}</span>
-              <button className="text-[var(--color-brand)]" type="button" onClick={() => toggleClassificationMask(label)}>
+              <button
+                className="text-[var(--color-brand)] disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                disabled={Boolean(actionKey)}
+                onClick={() => toggleClassificationMask(label)}
+              >
                 Toggle
               </button>
-              <button className="text-red-600" type="button" onClick={() => deleteClassification(label)}>
+              <button
+                className="text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                disabled={Boolean(actionKey)}
+                onClick={() => deleteClassification(label)}
+              >
                 Delete
               </button>
             </span>
@@ -290,13 +345,18 @@ export default function GovernancePage() {
               ))}
             </select>
           </label>
-          <Button type="button" variant="primary" disabled={!name.trim() || !matchValue.trim()} onClick={createPolicy}>
+          <Button
+            type="button"
+            variant="primary"
+            disabled={!name.trim() || !matchValue.trim()}
+            isLoading={actionKey === "create-policy"}
+            loadingText="Creating"
+            onClick={createPolicy}
+          >
             Create policy
           </Button>
         </div>
-        <div className="mt-3 rounded-[8px] bg-[var(--color-surface)] px-3 py-2 text-[12px] text-[var(--color-text-secondary)]">
-          {message}
-        </div>
+        <StatusMessage className="mt-3" tone={messageTone}>{message}</StatusMessage>
       </section>
 
       <DataTable headers={["Policy", "Type", "Status", "Rule", "Action", "Controls"]}>
@@ -309,10 +369,21 @@ export default function GovernancePage() {
             <td className="px-4 py-3 font-mono text-[11px] text-[var(--color-text-secondary)]">{JSON.stringify(policy.action)}</td>
             <td className="px-4 py-3">
               <div className="flex gap-2">
-                <Button type="button" onClick={() => togglePolicy(policy)}>
+                <Button
+                  type="button"
+                  onClick={() => togglePolicy(policy)}
+                  isLoading={actionKey === `policy-toggle-${policy.id}`}
+                  loadingText="Updating"
+                >
                   {policy.status === "active" ? "Disable" : "Enable"}
                 </Button>
-                <Button type="button" variant="danger" onClick={() => deletePolicy(policy)}>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => deletePolicy(policy)}
+                  isLoading={actionKey === `policy-delete-${policy.id}`}
+                  loadingText="Deleting"
+                >
                   Delete
                 </Button>
               </div>
