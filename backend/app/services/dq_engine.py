@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Asset, Column, DQIssue
+from app.services.standard_format_rules import matcher_from_standard_format
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,13 @@ def _pattern_for(column: Column) -> re.Pattern | None:
     return None
 
 
+def _consistency_matcher_for(column: Column):
+    pattern = _pattern_for(column)
+    if pattern is not None:
+        return lambda value: bool(pattern.match(str(value)))
+    return matcher_from_standard_format(column.standard_format)
+
+
 def _accuracy_valid(value: object, column: Column) -> bool:
     if value is None:
         return False
@@ -93,11 +101,11 @@ def _calculate_column_scores(
     distinct = connection.execute(f"select count(distinct {field}) from {table} where {field} is not null").fetchone()[0]
     values = [row[0] for row in connection.execute(f"select {field} from {table}").fetchall()]
 
-    pattern = _pattern_for(column)
-    if pattern is None:
+    consistency_matcher = _consistency_matcher_for(column)
+    if consistency_matcher is None:
         consistency = 100.0
     else:
-        consistency = _score(sum(1 for value in values if value is not None and pattern.match(str(value))), total)
+        consistency = _score(sum(1 for value in values if value is not None and consistency_matcher(value)), total)
 
     accuracy = _score(sum(1 for value in values if _accuracy_valid(value, column)), total)
 

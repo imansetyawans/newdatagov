@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Asset, Column, DQIssue
+from app.services.standard_format_rules import matcher_from_standard_format
 
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -299,12 +300,13 @@ def _average(values: list[float | None]) -> float | None:
 
 def _consistency_score(column: Column, values: list[Any]) -> float | None:
     pattern = _pattern_for(column)
-    if pattern is None:
+    matcher = (lambda value: bool(pattern.match(str(value).strip()))) if pattern is not None else matcher_from_standard_format(column.standard_format)
+    if matcher is None:
         return 100.0
     usable = [value for value in values if value is not None and str(value).strip()]
     if not usable:
         return None
-    return _score(sum(1 for value in usable if pattern.match(str(value).strip())), len(usable))
+    return _score(sum(1 for value in usable if matcher(value)), len(usable))
 
 
 def _pattern_for(column: Column) -> re.Pattern | None:
